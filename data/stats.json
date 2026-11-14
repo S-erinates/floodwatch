@@ -1,0 +1,9 @@
+{
+  "region_name": "Örnek Çalışma Bölgesi (NISAR GCOV)",
+  "date1": "2026-10-05",
+  "date2": "2026-10-29",
+  "area_date1_km2": 14.8,
+  "area_date2_km2": 22.4,
+  "change_percent": 51.35,
+  "bounds": [[39.68, 36.92], [39.82, 37.15]]
+}
