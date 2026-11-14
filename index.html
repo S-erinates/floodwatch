@@ -3,142 +3,248 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FloodWatch — NISAR GCOV Surface & Water Change Analysis</title>
-  <!-- Ready-to-use Before/After Slider Library -->
+  <title>FloodWatch // NISAR L-Band SAR Telemetry & Inundation Intelligence</title>
+  <!-- Google Fonts: Space Grotesk & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Before/After Slider -->
   <script defer src="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/index.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/styles.css" />
+  <!-- Leaflet Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="bg-grid"></div>
+
+  <!-- TOP TELEMETRY NAVBAR -->
+  <nav class="topbar">
+    <div class="brand">
+      <span class="pulse-dot"></span>
+      <span class="brand-name">FLOODWATCH</span>
+      <span class="brand-tag">NISAR L-BAND GCOV TELEMETRY</span>
+    </div>
+    <div class="topbar-actions">
+      <div class="severity-badge" id="severity-badge">STATUS: ANALYZING...</div>
+      <button class="action-btn" id="btn-export" title="Export PDF / Print Briefing">🖨️ Export Briefing</button>
+    </div>
+  </nav>
+
   <header class="hero">
-    <div class="badge">NASA Space Apps • NISAR GCOV Radar Analysis</div>
-    <h1>FloodWatch</h1>
-    <!-- MERAL WILL WRITE HERE (One-sentence project description in English) -->
+    <div class="hero-chip">NASA SPACE APPS CHALLENGE • ASF DAAC VERTEX</div>
+    <h1>All-Weather Radar Surface Water & Flood Intelligence</h1>
+    <!-- MERAL WILL WRITE HERE (One-sentence project summary) -->
     <p id="project-subtitle">
-      An interactive radar analysis platform tracking floods, inundation, and surface water dynamics using NISAR L-band GCOV data—day or night, through any cloud cover.
+      Tracking dynamic inundation, flood expansion, and reservoir changes using dual-polarization (HH/HV) NISAR L-band Synthetic Aperture Radar—penetrating clouds, rain, and darkness.
     </p>
   </header>
 
   <main class="container">
-    <!-- STATS BOX (Automatically populated from stats.json) -->
+    <!-- ANIMATED TELEMETRY KPI ROW -->
     <section class="stats-bar">
       <div class="stat-card">
-        <span class="stat-label">Study Region</span>
+        <div class="stat-top">
+          <span class="stat-label">Target Region & Orbit</span>
+          <span class="stat-icon">🛰️</span>
+        </div>
         <strong id="stat-region">Loading...</strong>
+        <span class="stat-sub" id="stat-bounds">Bounds: --</span>
       </div>
+
       <div class="stat-card">
-        <span class="stat-label">Water Area Comparison</span>
-        <strong id="stat-summary">Water area: -- km² → -- km²</strong>
+        <div class="stat-top">
+          <span class="stat-label" id="label-stat-date1">Baseline Water Extent</span>
+          <span class="stat-icon">🌊</span>
+        </div>
+        <strong id="stat-area1">-- km²</strong>
+        <div class="mini-progress"><div id="bar-area1" class="mini-fill blue" style="width: 45%"></div></div>
       </div>
+
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-label" id="label-stat-date2">Post-Event Water Extent</span>
+          <span class="stat-icon">⚠️</span>
+        </div>
+        <strong id="stat-area2">-- km²</strong>
+        <div class="mini-progress"><div id="bar-area2" class="mini-fill red" style="width: 75%"></div></div>
+      </div>
+
       <div class="stat-card highlight">
-        <span class="stat-label">Net Change (%)</span>
+        <div class="stat-top">
+          <span class="stat-label">Net Surface Change</span>
+          <span class="stat-icon">📈</span>
+        </div>
         <strong id="stat-change">--%</strong>
-      </div>
-      <div class="stat-card">
-        <span class="stat-label">Bounding Box (Bounds)</span>
-        <strong id="stat-bounds" class="small-code">--</strong>
+        <span class="stat-sub" id="stat-diff-km2">Delta: -- km²</span>
       </div>
     </section>
 
-    <!-- CONTROL BUTTONS (Layer and Polarization Band Selection) -->
-    <section class="controls">
-      <div class="control-group">
-        <span class="group-title">1. Select Layer:</span>
-        <div class="btn-row">
-          <button class="btn layer-btn active" data-layer="radar">Radar Backscatter (dB)</button>
-          <button class="btn layer-btn" data-layer="water">Water Mask</button>
-          <button class="btn layer-btn" data-layer="change">Change Map</button>
+    <!-- MAIN MISSION CONTROL DECK -->
+    <section class="control-deck">
+      <div class="deck-row">
+        <!-- View Mode Switcher (Slider vs Geo-Map) -->
+        <div class="control-group">
+          <span class="group-title">VIEW MODE</span>
+          <div class="btn-row">
+            <button class="btn mode-btn active" data-mode="slider">🖼️ Split Curtain</button>
+            <button class="btn mode-btn" data-mode="map">🌍 Geo-Map Overlay</button>
+          </div>
+        </div>
+
+        <!-- Layer Switcher -->
+        <div class="control-group">
+          <span class="group-title">DATA LAYER</span>
+          <div class="btn-row">
+            <button class="btn layer-btn active" data-layer="radar">📡 Radar (dB)</button>
+            <button class="btn layer-btn" data-layer="water">💧 Water Mask</button>
+            <button class="btn layer-btn" data-layer="change">🔥 Change Map</button>
+          </div>
+        </div>
+
+        <!-- Polarization Switcher -->
+        <div class="control-group" id="band-group">
+          <span class="group-title">POLARIZATION</span>
+          <div class="btn-row">
+            <button class="btn band-btn active" data-band="HH">HH (Surface)</button>
+            <button class="btn band-btn" data-band="HV">HV (Canopy)</button>
+          </div>
         </div>
       </div>
 
-      <div class="control-group" id="band-group">
-        <span class="group-title">2. Polarization Band:</span>
-        <div class="btn-row">
-          <button class="btn band-btn active" data-band="HH">HH (Surface Roughness)</button>
-          <button class="btn band-btn" data-band="HV">HV (Vegetation & Structure)</button>
+      <!-- Interactive Otsu / dB Threshold Simulator Bar -->
+      <div class="simulator-bar">
+        <div class="sim-info">
+          <span class="sim-badge">INTERACTIVE SAR THRESHOLD SIMULATOR</span>
+          <span id="threshold-readout">Backscatter Cutoff: <strong>-19.0 dB</strong> (Otsu Optimal)</span>
+        </div>
+        <div class="sim-controls">
+          <label for="threshold-slider">-25 dB (Strict)</label>
+          <input type="range" id="threshold-slider" min="-25" max="-13" step="0.5" value="-19" />
+          <label for="threshold-slider">-13 dB (Relaxed)</label>
+          <span class="sim-est" id="sim-est-area">Est. Mask Sensitivity: Standard</span>
         </div>
       </div>
     </section>
 
-    <!-- VISUAL COMPARISON VIEWER -->
+    <!-- MAIN VISUALIZATION VIEWPORT -->
     <section class="viewer-card">
       <div class="viewer-header">
-        <span id="current-view-title">Active View: Radar Backscatter (HH Band) — Before / After Comparison</span>
-      </div>
-
-      <!-- Before / After Slider (Active for Radar and Water Mask Layers) -->
-      <div id="slider-container">
-        <div class="date-labels">
-          <span class="date-pill left" id="label-date1">Date 1: --</span>
-          <span class="date-pill right" id="label-date2">Date 2: --</span>
+        <div id="current-view-title">ACTIVE FEED: RADAR BACKSCATTER (HH BAND)</div>
+        <!-- Live Cursor Telemetry Readout -->
+        <div class="cursor-telemetry" id="cursor-telemetry">
+          <span>LAT/LON: <b id="cur-coords">-- , --</b></span>
+          <span>EST. σ°: <b id="cur-db">-- dB</b></span>
+          <span>CLASS: <b id="cur-class" class="tag-neutral">HOVER IMAGE</b></span>
         </div>
-        <img-comparison-slider class="comparison-slider">
-          <img slot="first" id="img-before" src="data/date1_HH.png" alt="Date 1 Radar Image" />
-          <img slot="second" id="img-after" src="data/date2_HH.png" alt="Date 2 Radar Image" />
-        </img-comparison-slider>
-        <p class="slider-hint">↔ Drag the center slider left or right to compare surface changes between the two dates.</p>
       </div>
 
-      <!-- Single Map View (Active for Change Map Layer) -->
-      <div id="single-container" class="hidden">
-        <img id="img-change" src="data/change_map.png" alt="Surface Water Change Map" />
-        <p class="slider-hint">Combined change detection map showing newly flooded/inundated pixels vs. receded water areas.</p>
+      <!-- MODE 1: Split Curtain Comparison Slider -->
+      <div id="viewport-slider">
+        <div id="slider-container">
+          <div class="date-labels">
+            <span class="date-pill left" id="label-date1">BEFORE: --</span>
+            <span class="date-pill right" id="label-date2">AFTER: --</span>
+          </div>
+          <div class="image-stage" id="interactive-stage">
+            <img-comparison-slider class="comparison-slider">
+              <img slot="first" id="img-before" src="data/date1_HH.png" alt="Date 1 Radar Image" />
+              <img slot="second" id="img-after" src="data/date2_HH.png" alt="Date 2 Radar Image" />
+            </img-comparison-slider>
+          </div>
+          <p class="slider-hint">↔ Slide the divider to compare Date 1 vs. Date 2 • Move cursor over radar to inspect backscatter telemetry.</p>
+        </div>
+
+        <!-- Single View (Change Map) -->
+        <div id="single-container" class="hidden">
+          <div class="image-stage" id="single-stage">
+            <img id="img-change" src="data/change_map.png" alt="Surface Water Change Map" />
+          </div>
+          <p class="slider-hint">Pixel-wise anomaly map highlighting newly inundated zones vs. water recession.</p>
+        </div>
       </div>
 
-      <!-- COLOR LEGEND -->
+      <!-- MODE 2: Interactive Leaflet Satellite Geo-Map -->
+      <div id="viewport-map" class="hidden">
+        <div class="map-toolbar">
+          <span>Overlay Layer on Satellite Basemap:</span>
+          <div class="map-opacity-ctrl">
+            <label for="map-opacity">Radar Opacity:</label>
+            <input type="range" id="map-opacity" min="0" max="1" step="0.05" value="0.8" />
+            <span id="map-opacity-val">80%</span>
+          </div>
+        </div>
+        <div id="leaflet-map"></div>
+        <p class="slider-hint">Georeferenced using `bounds` from `stats.json` over Esri World Imagery satellite tiles.</p>
+      </div>
+
+      <!-- SCIENTIFIC COLOR LEGEND -->
       <div class="legend">
         <div class="legend-item">
           <span class="swatch swatch-dark"></span>
-          <span><strong>Dark / Black (-25 to -18 dB):</strong> Calm Open Water</span>
+          <span><strong>Specular Dark (-25 to -18 dB):</strong> Smooth Open Water</span>
         </div>
         <div class="legend-item">
           <span class="swatch swatch-bright"></span>
-          <span><strong>Light Gray / White (-10 to 0 dB):</strong> Land, Vegetation & Urban</span>
+          <span><strong>High Backscatter (-10 to 0 dB):</strong> Rough Land / Urban / Canopy</span>
         </div>
         <div class="legend-item">
           <span class="swatch swatch-flood"></span>
-          <span><strong>Red / Blue (Change):</strong> Water Gain / Newly Flooded Area</span>
+          <span><strong>Red / Cyan Anomaly:</strong> Newly Flooded / Inundation Gain</span>
         </div>
         <div class="legend-item">
           <span class="swatch swatch-recede"></span>
-          <span><strong>Yellow / Orange (Change):</strong> Water Loss / Receded Area</span>
+          <span><strong>Amber / Yellow:</strong> Receded Water / Drawdown</span>
         </div>
       </div>
     </section>
 
-    <!-- MERAL'S SCIENCE & STORY CARDS -->
+    <!-- MERAL'S SCIENTIFIC NARRATIVE & ANALYSIS CARDS -->
     <section class="info-grid">
       <article class="info-card">
+        <div class="card-kicker">RADAR PHYSICS</div>
         <h2>📡 How Does Radar See Water?</h2>
-        <!-- MERAL WILL WRITE HERE ("How radar sees" box in English) -->
-        <p>
-          Unlike optical sensors, Synthetic Aperture Radar (SAR) transmits its own microwave pulses, operating <strong>day and night through heavy clouds and rain</strong>. Calm water surfaces act like a mirror (specular reflection), bouncing radar energy away from the satellite and appearing <strong>very dark (low backscatter in dB)</strong>. <strong>HH polarization</strong> is highly sensitive to surface roughness and open water, while <strong>HV polarization</strong> responds to vegetation structure and flooded vegetation canopies.
+        <!-- MERAL WILL WRITE HERE -->
+        <p id="meral-radar-box">
+          Unlike optical satellites blinded by cloud cover or night, Synthetic Aperture Radar (SAR) transmits active L-band microwave pulses (~24 cm wavelength). Calm water surfaces act as a mirror (<strong>specular reflection</strong>), deflecting radar energy away from the sensor so water pixels appear <strong>extremely dark (low dB)</strong>. <strong>HH polarization</strong> captures surface roughness variations, while <strong>HV cross-polarization</strong> penetrates vegetation to detect flooded forests and agricultural wetlands.
         </p>
       </article>
 
       <article class="info-card">
+        <div class="card-kicker">REGIONAL CONTEXT & PIPELINE</div>
         <h2>🌍 Study Area & Methodology</h2>
-        <!-- MERAL WILL WRITE HERE (Region introduction & method summary in English) -->
-        <p>
-          <strong>Study Region:</strong> Dual-date NISAR GCOV scenes from the same track/frame and orbit direction were selected via ASF Vertex to ensure co-registered grid alignment.<br><br>
-          <strong>Methodology:</strong> `HHHH` and `HVHV` backscatter grids under `science/LSAR/GCOV/grids/frequencyA/` were extracted using `h5py`, converted to decibels (`10 * log10`), smoothed with a speckle filter, and classified into binary water masks (~ -19 dB / Otsu threshold) to compute total water area (km²) and net percentage change.
+        <!-- MERAL WILL WRITE HERE -->
+        <p id="meral-method-box">
+          <strong>Study Area:</strong> Co-registered dual-date NISAR GCOV scenes (matching track, frame, and orbit direction) were retrieved via ASF Vertex.<br><br>
+          <strong>Processing Pipeline:</strong> Using Python (`h5py`), `HHHH` and `HVHV` covariance grids under `science/LSAR/GCOV/grids/frequencyA/` were converted to decibels (`10 * log10`), filtered for speckle noise, and segmented via Otsu thresholding (~ -19 dB) to quantify exact water surface area (km²) and net change.
         </p>
       </article>
 
       <article class="info-card full-width">
-        <h2>📊 Findings, Limitations & Future Applications</h2>
-        <!-- MERAL WILL WRITE HERE (Interpretation, limitations & future applications in English) -->
-        <p>
-          <strong>Interpretation:</strong> Observed changes in surface water extent correlate with regional precipitation events, floodplain inundation, seasonal hydrology, or reservoir management.<br><br>
-          <strong>Limitations:</strong> This rapid analysis relies on dual-date thresholding. While SAR is unaffected by cloud cover, strong winds can roughen open water surfaces (increasing backscatter and affecting water mask accuracy), and dense forest canopies can induce double-bounce scattering.<br><br>
-          <strong>Future Impact:</strong> Leveraging NISAR's 12-day repeat cycle, FloodWatch can scale into an automated early flood warning tool, drought/reservoir tracker, and agricultural water management system.
-        </p>
+        <div class="card-kicker">INTERPRETATION & ROADMAP</div>
+        <h2>📊 Hydrological Findings, Limitations & Future Impact</h2>
+        <!-- MERAL WILL WRITE HERE -->
+        <div class="three-col-text" id="meral-interpretation-box">
+          <div>
+            <h3>Hydrological Drivers</h3>
+            <p>Observed surface water expansion/recession aligns with extreme precipitation events, floodplain overflow, seasonal snowmelt, or dam reservoir release operations.</p>
+          </div>
+          <div>
+            <h3>Scientific Limitations</h3>
+            <p>Single-threshold binary classification across two dates can be influenced by wind-induced capillary waves (which roughen water and raise dB backscatter) or double-bounce scattering in dense flooded forests.</p>
+          </div>
+          <div>
+            <h3>NISAR Future Applications</h3>
+            <p>With NISAR's systematic 12-day global repeat cycle, FloodWatch scales into an operational early flood warning system, drought reservoir monitor, and precision irrigation planner.</p>
+          </div>
+        </div>
       </article>
     </section>
   </main>
 
   <footer class="footer">
-    <p>FloodWatch • Data Source: NASA / ISRO NISAR GCOV (ASF DAAC Vertex) • Team: Doğaca (Data/Analysis), Meral (Science/Story), Hasan (Web)</p>
+    <p><strong>FLOODWATCH</strong> • NASA Space Apps Challenge • Data: NASA/ISRO NISAR GCOV via ASF DAAC Vertex • Team: <strong>Doğaca</strong> (SAR Data & Python), <strong>Meral</strong> (Science & Narrative), <strong>Hasan</strong> (Web Architecture & Visualization)</p>
   </footer>
 
   <script src="script.js"></script>
