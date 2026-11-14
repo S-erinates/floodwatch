@@ -10,7 +10,7 @@ const DEFAULT_STATS = {
   region: "Inner Niger Delta, Mali",
   before_date: "2026-07-17",
   after_date: "2026-10-21",
-  water_before_km2: 1035.2,  
+  water_before_km2: 1035.2,
   water_after_km2: 3129.9,
   water_gain_km2: 2360.5,
   water_loss_km2: 265.8,
@@ -107,31 +107,19 @@ function createPlaceholderSVG(title, subtitle, isAfter, mode) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
-// Önce hafif WebP (data/web/), yoksa orijinal PNG, o da yoksa SVG placeholder
-function imageSources(name) {
-  return [`data/web/${name}.webp`, `data/${name}.png`];
-}
-
-function setImageWithFallback(element, name, title, isAfter, mode) {
+function setImageWithFallback(element, path, title, isAfter, mode) {
   if (!element) return;
-  const sources = imageSources(name);
-  let i = 0;
   element.onerror = function () {
-    i++;
-    if (i < sources.length) {
-      this.src = sources[i];
-    } else {
-      this.onerror = null;
-      this.src = createPlaceholderSVG(title, sources[sources.length - 1], isAfter, mode);
-    }
+    this.onerror = null;
+    this.src = createPlaceholderSVG(title, path, isAfter, mode);
   };
-  element.src = sources[0];
+  element.src = path;
 }
 
-function activeMapName() {
-  if (currentLayer === "water") return "water_after";
-  if (currentLayer === "change") return "change_map";
-  return `after_${currentBand}`;
+function activeMapPath() {
+  if (currentLayer === "water") return "data/water_after.png";
+  if (currentLayer === "change") return "data/change_map.png";
+  return `data/after_${currentBand}.png`;
 }
 
 // ---------- Eşik önizleme filtresi ----------
@@ -159,9 +147,9 @@ function updateViewer() {
     singleContainer?.classList.add("hidden");
     bandGroup?.classList.remove("disabled-group");
 
-    setImageWithFallback(imgBefore, `before_${currentBand}`,
+    setImageWithFallback(imgBefore, `data/before_${currentBand}.png`,
       `BEFORE (${statsData.before_date}) - ${currentBand}`, false, "radar");
-    setImageWithFallback(imgAfter, `after_${currentBand}`,
+    setImageWithFallback(imgAfter, `data/after_${currentBand}.png`,
       `AFTER (${statsData.after_date}) - ${currentBand}`, true, "radar");
     setText(viewTitle, `ACTIVE FEED: RADAR BACKSCATTER (${currentBand} BAND)`);
   } else if (currentLayer === "water") {
@@ -169,15 +157,15 @@ function updateViewer() {
     singleContainer?.classList.add("hidden");
     bandGroup?.classList.add("disabled-group");
 
-    setImageWithFallback(imgBefore, "water_before", "BEFORE WATER MASK", false, "water");
-    setImageWithFallback(imgAfter, "water_after", "AFTER WATER MASK", true, "water");
+    setImageWithFallback(imgBefore, "data/water_before.png", "BEFORE WATER MASK", false, "water");
+    setImageWithFallback(imgAfter, "data/water_after.png", "AFTER WATER MASK", true, "water");
     setText(viewTitle, "ACTIVE FEED: OPEN-WATER MASK COMPARISON");
   } else {
     sliderContainer?.classList.add("hidden");
     singleContainer?.classList.remove("hidden");
     bandGroup?.classList.add("disabled-group");
 
-    setImageWithFallback(imgChange, "change_map", "INNER NIGER DELTA WATER CHANGE", true, "change");
+    setImageWithFallback(imgChange, "data/change_map.png", "INNER NIGER DELTA WATER CHANGE", true, "change");
     setText(viewTitle, "ACTIVE FEED: MULTI-TEMPORAL WATER CHANGE MAP");
   }
 
@@ -185,7 +173,7 @@ function updateViewer() {
   applyThresholdPreviewFilter();
 
   if (currentMode === "map") {
-    updateLeafletOverlay(activeMapName(), currentLayer);
+    updateLeafletOverlay(activeMapPath(), currentLayer);
   }
 }
 
@@ -210,33 +198,24 @@ function initOrUpdateMap() {
     map.invalidateSize();
     map.fitBounds(bounds);
   }, 120);
-  updateLeafletOverlay(activeMapName(), currentLayer);
+  updateLeafletOverlay(activeMapPath(), currentLayer);
   return true;
 }
 
-function updateLeafletOverlay(name, mode) {
+function updateLeafletOverlay(path, mode) {
   if (!map) return;
   const requestId = ++overlayRequestId;
   const bounds = normalizeBounds(statsData.bounds);
-  const sources = imageSources(name);
   const place = (url) => {
     if (requestId !== overlayRequestId) return; // daha yeni bir istek var, bunu at
     const opacity = num($("#map-opacity")?.value, 0.8);
     if (mapOverlay) map.removeLayer(mapOverlay);
     mapOverlay = L.imageOverlay(url, bounds, { opacity, interactive: false }).addTo(map);
   };
-  // WebP -> PNG -> placeholder sırasıyla dene
-  const tryLoad = (i) => {
-    if (i >= sources.length) {
-      place(createPlaceholderSVG("GEOREFERENCED DEMO OVERLAY", sources[sources.length - 1], true, mode));
-      return;
-    }
-    const test = new Image();
-    test.onload = () => place(sources[i]);
-    test.onerror = () => tryLoad(i + 1);
-    test.src = sources[i];
-  };
-  tryLoad(0);
+  const test = new Image();
+  test.onload = () => place(path);
+  test.onerror = () => place(createPlaceholderSVG("GEOREFERENCED DEMO OVERLAY", path, true, mode));
+  test.src = path;
 }
 
 // ---------- İstatistikler ----------
@@ -295,11 +274,31 @@ async function loadStats() {
   animateValue($("#stat-area2"), areaAfter, 900, " km²");
   animateValue($("#stat-change"), changePercent, 1000, "%", changePercent > 0 ? "+" : "");
 
-  const maxArea = Math.max(areaBefore, areaAfter, 1) * 1.1;
+  // Analiz kapsamı (stats.json'da varsa göster)
+  const validArea = num(statsData.valid_area_km2);
+  const excludedArea = num(statsData.excluded_artifact_km2);
+  const pixelSize = Array.isArray(statsData.pixel_size_m) ? num(statsData.pixel_size_m[0]) : 0;
+  const coverage = [];
+  if (validArea > 0) coverage.push(`Valid area: ${validArea.toFixed(1)} km²`);
+  if (pixelSize > 0) coverage.push(`${pixelSize} m pixels`);
+  if (excludedArea > 0) coverage.push(`Excluded artifacts: ${excludedArea.toFixed(1)} km²`);
+  setText("#stat-coverage", coverage.join(" · "));
+
+  // HH > 3 dB değişimi: sınıflandırmadan bağımsız bir kontrol
+  const hhDrop = num(statsData.hh_drop_gt3db_km2);
+  const hhRise = num(statsData.hh_rise_gt3db_km2);
+  if (hhDrop > 0 || hhRise > 0) {
+    setText("#stat-hh-check", `HH >3 dB: drop ${hhDrop.toFixed(1)} km² · rise ${hhRise.toFixed(1)} km²`);
+  }
+
+  // Çubuklar: geçerli alan biliniyorsa, suyun geçerli alana oranı
+  const barBase = validArea > 0 ? validArea : Math.max(areaBefore, areaAfter, 1) * 1.1;
   const bar1 = $("#bar-area1");
   const bar2 = $("#bar-area2");
-  if (bar1) bar1.style.width = `${Math.min(100, areaBefore / maxArea * 100)}%`;
-  if (bar2) bar2.style.width = `${Math.min(100, areaAfter / maxArea * 100)}%`;
+  const pct1 = Math.min(100, areaBefore / barBase * 100);
+  const pct2 = Math.min(100, areaAfter / barBase * 100);
+  if (bar1) { bar1.style.width = `${pct1}%`; bar1.title = `${pct1.toFixed(1)}% of valid area`; }
+  if (bar2) { bar2.style.width = `${pct2}%`; bar2.title = `${pct2.toFixed(1)}% of valid area`; }
 
   if (changePercent > 0) {
     setText("#severity-badge", `OBSERVED WATER EXPANSION: +${changePercent.toFixed(1)}%`);
@@ -310,8 +309,151 @@ async function loadStats() {
   }
 
   synchronizeThresholdControls();
+  renderTimeSeries();
   updateViewer();
 }
+
+// ---------- Zaman serisi grafiği (stats.json → time_series) ----------
+
+function getTimeSeries() {
+  if (!Array.isArray(statsData.time_series)) return [];
+  return statsData.time_series
+    .map(p => ({ date: String(p?.date ?? ""), km2: num(p?.water_km2), t: Date.parse(p?.date) }))
+    .filter(p => Number.isFinite(p.t) && p.km2 > 0)
+    .sort((a, b) => a.t - b.t);
+}
+
+function formatKm2(value) {
+  return value.toLocaleString("en-US", { maximumFractionDigits: 1 });
+}
+
+function formatDate(iso) {
+  const d = new Date(iso + "T00:00:00Z");
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+function niceStep(max) {
+  const raw = max / 5;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const unit = raw / pow;
+  return (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * pow;
+}
+
+function renderTimeSeries() {
+  const card = $("#timeseries-card");
+  const chart = $("#ts-chart");
+  const series = getTimeSeries();
+  if (!card || !chart) return;
+  if (series.length < 2) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+
+  const first = series[0];
+  const last = series[series.length - 1];
+  const peak = series.reduce((a, b) => (b.km2 > a.km2 ? b : a));
+  setText("#ts-summary",
+    `${series.length} dates · ${formatKm2(first.km2)} → ${formatKm2(last.km2)} km² · peak ${formatDate(peak.date)}`);
+  setText("#ts-note", statsData.time_series_note ||
+    "Main before/after comparison uses the first and last dates. Values are approximate estimates from the Python pipeline.");
+
+  // Veri tablosu (erişilebilirlik + yazdırma)
+  const body = $("#ts-table-body");
+  if (body) {
+    body.innerHTML = "";
+    for (const p of series) {
+      const row = document.createElement("tr");
+      const change = ((p.km2 - first.km2) / first.km2) * 100;
+      [formatDate(p.date), formatKm2(p.km2), p === first ? "baseline" : `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`]
+        .forEach(text => { const td = document.createElement("td"); td.textContent = text; row.appendChild(td); });
+      body.appendChild(row);
+    }
+  }
+
+  // Ölçekler
+  const width = Math.max(280, chart.clientWidth || 800);
+  const height = width < 500 ? 240 : 300;
+  const pad = { top: 28, right: width < 500 ? 56 : 72, bottom: 34, left: 56 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+  const step = niceStep(peak.km2);
+  const yMax = Math.ceil((peak.km2 * 1.08) / step) * step;
+  const x = t => pad.left + ((t - first.t) / (last.t - first.t || 1)) * innerW;
+  const y = v => pad.top + innerH - (v / yMax) * innerH;
+
+  const ns = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, text) => {
+    const node = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, width, height, class: "ts-svg" });
+
+  // Izgara ve y ekseni
+  for (let v = 0; v <= yMax; v += step) {
+    svg.appendChild(el("line", { x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v), class: v === 0 ? "ts-baseline" : "ts-grid" }));
+    svg.appendChild(el("text", { x: pad.left - 8, y: y(v) + 4, "text-anchor": "end", class: "ts-axis" }, v.toLocaleString("en-US")));
+  }
+  svg.appendChild(el("text", { x: pad.left - 8, y: pad.top - 12, "text-anchor": "end", class: "ts-axis" }, "km²"));
+
+  // X ekseni etiketleri (dar ekranda yalnızca ilk ve son)
+  series.forEach((p, i) => {
+    if (width < 500 && i !== 0 && i !== series.length - 1) return;
+    const label = new Date(p.date + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+    svg.appendChild(el("text", { x: x(p.t), y: height - 10, "text-anchor": "middle", class: "ts-axis" }, label));
+  });
+
+  // Alan + çizgi
+  const linePts = series.map(p => `${x(p.t)},${y(p.km2)}`).join(" ");
+  svg.appendChild(el("polygon", {
+    points: `${x(first.t)},${y(0)} ${linePts} ${x(last.t)},${y(0)}`, class: "ts-area"
+  }));
+  svg.appendChild(el("polyline", { points: linePts, class: "ts-line" }));
+
+  // Noktalar + seçili doğrudan etiketler (ilk ve son)
+  for (const p of series) {
+    svg.appendChild(el("circle", { cx: x(p.t), cy: y(p.km2), r: 4.5, class: "ts-dot" }));
+  }
+  svg.appendChild(el("text", { x: x(first.t), y: y(first.km2) - 12, "text-anchor": "start", class: "ts-label" }, `${formatKm2(first.km2)} km²`));
+  svg.appendChild(el("text", { x: x(last.t) - 8, y: y(last.km2) + 4, "text-anchor": "end", class: "ts-label" }, `${formatKm2(last.km2)} km²`));
+
+  // Fareyle / klavyeyle okunabilen geniş tıklama alanları
+  const tooltip = $("#ts-tooltip");
+  const wrap = $("#ts-wrap");
+  const show = (p, cx, cy) => {
+    if (!tooltip || !wrap) return;
+    const change = ((p.km2 - first.km2) / first.km2) * 100;
+    tooltip.innerHTML = "";
+    const strong = document.createElement("strong");
+    strong.textContent = `${formatKm2(p.km2)} km²`;
+    tooltip.append(formatDate(p.date), document.createElement("br"), strong,
+      p === first ? " (baseline)" : ` (${change >= 0 ? "+" : ""}${change.toFixed(1)}%)`);
+    tooltip.classList.remove("hidden");
+    const scale = chart.clientWidth / width || 1;
+    const left = Math.min(Math.max(cx * scale, 70), wrap.clientWidth - 70);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${cy * scale}px`;
+  };
+  const hide = () => tooltip?.classList.add("hidden");
+  for (const p of series) {
+    const hit = el("circle", {
+      cx: x(p.t), cy: y(p.km2), r: 16, class: "ts-hit", tabindex: 0,
+      "aria-label": `${formatDate(p.date)}: ${formatKm2(p.km2)} square kilometres`
+    });
+    hit.addEventListener("mouseenter", () => show(p, x(p.t), y(p.km2)));
+    hit.addEventListener("focus", () => show(p, x(p.t), y(p.km2)));
+    hit.addEventListener("mouseleave", hide);
+    hit.addEventListener("blur", hide);
+    svg.appendChild(hit);
+  }
+
+  chart.replaceChildren(svg);
+}
+
+let tsResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(tsResizeTimer);
+  tsResizeTimer = setTimeout(renderTimeSeries, 150);
+});
 
 // ---------- Fare ile koordinat okuma ----------
 
@@ -342,7 +484,9 @@ function synchronizeThresholdControls() {
 
   if (slider) slider.value = hh.toString();
   setText("#threshold-value", `${hh.toFixed(1)} dB`);
-  setText("#sim-est-area", `Analysis rule: HH < ${hh.toFixed(1)} dB · HV < ${hv.toFixed(1)} dB`);
+  setText("#sim-est-area", statsData.method
+    ? `Analysis rule: ${statsData.method}`
+    : `Analysis rule: HH < ${hh.toFixed(1)} dB · HV < ${hv.toFixed(1)} dB`);
   applyThresholdPreviewFilter();
 }
 
