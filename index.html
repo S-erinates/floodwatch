@@ -114,18 +114,50 @@
       </div>
 
       <!-- Interactive Otsu / dB Threshold Simulator Bar -->
-      <div class="simulator-bar">
-        <div class="sim-info">
-          <span class="sim-badge">INTERACTIVE SAR THRESHOLD SIMULATOR</span>
-          <span id="threshold-readout">Backscatter Cutoff: <strong>-19.0 dB</strong> (Otsu Optimal)</span>
-        </div>
-        <div class="sim-controls">
-          <label for="threshold-slider">-25 dB (Strict)</label>
-          <input type="range" id="threshold-slider" min="-25" max="-13" step="0.5" value="-19" />
-          <label for="threshold-slider">-13 dB (Relaxed)</label>
-          <span class="sim-est" id="sim-est-area">Est. Mask Sensitivity: Standard</span>
-        </div>
-      </div>
+<div class="simulator-bar">
+  <div class="sim-info">
+    <span class="sim-badge">
+      HH THRESHOLD SENSITIVITY PREVIEW
+    </span>
+
+    <span id="threshold-readout">
+      HH Backscatter Cutoff:
+      <strong id="threshold-value">-19.0 dB</strong>
+    </span>
+  </div>
+
+  <div class="sim-controls">
+    <label for="threshold-slider">
+      -25 dB
+      <small>Strict</small>
+    </label>
+
+    <input
+      type="range"
+      id="threshold-slider"
+      min="-25"
+      max="-13"
+      step="0.5"
+      value="-19"
+      aria-label="HH backscatter threshold preview"
+    >
+
+    <label for="threshold-slider">
+      -13 dB
+      <small>Relaxed</small>
+    </label>
+
+    <span class="sim-est" id="sim-est-area">
+      Analysis rule:
+      HH &lt; -19 dB and HV &lt; -24 dB
+    </span>
+  </div>
+
+  <p class="sim-disclaimer">
+    Visual sensitivity preview only. Valid water-area statistics
+    are calculated by the Python processing pipeline.
+  </p>
+</div>
     </section>
 
     <!-- MAIN VISUALIZATION VIEWPORT -->
