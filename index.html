@@ -1,144 +1,144 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FloodWatch — NISAR GCOV Yüzey ve Su Değişim Analizi</title>
-  <!-- Hazır Before/After Slider Kütüphanesi -->
+  <title>FloodWatch — NISAR GCOV Surface & Water Change Analysis</title>
+  <!-- Ready-to-use Before/After Slider Library -->
   <script defer src="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/index.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/styles.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="hero">
-    <div class="badge">NASA Space Apps • NISAR GCOV Radar Analizi</div>
+    <div class="badge">NASA Space Apps • NISAR GCOV Radar Analysis</div>
     <h1>FloodWatch</h1>
-    <!-- MERAL BURAYA YAZACAK (Tek cümlelik proje tanımı) -->
+    <!-- MERAL WILL WRITE HERE (One-sentence project description in English) -->
     <p id="project-subtitle">
-      NISAR L-bant radar verileriyle bulut ve gece engeli olmadan taşkın, sel ve su yüzeyi değişimlerini izleyen interaktif analiz platformu.
+      An interactive radar analysis platform tracking floods, inundation, and surface water dynamics using NISAR L-band GCOV data—day or night, through any cloud cover.
     </p>
   </header>
 
   <main class="container">
-    <!-- İSTATİSTİK KUTUSU (stats.json'dan otomatik okunur) -->
+    <!-- STATS BOX (Automatically populated from stats.json) -->
     <section class="stats-bar">
       <div class="stat-card">
-        <span class="stat-label">İncelenen Bölge</span>
-        <strong id="stat-region">Yükleniyor...</strong>
+        <span class="stat-label">Study Region</span>
+        <strong id="stat-region">Loading...</strong>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Özet Karşılaştırma</span>
-        <strong id="stat-summary">Su alanı: -- km² → -- km²</strong>
+        <span class="stat-label">Water Area Comparison</span>
+        <strong id="stat-summary">Water area: -- km² → -- km²</strong>
       </div>
       <div class="stat-card highlight">
-        <span class="stat-label">Net Değişim Oranı</span>
-        <strong id="stat-change">%--</strong>
+        <span class="stat-label">Net Change (%)</span>
+        <strong id="stat-change">--%</strong>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Coğrafi Sınırlar (Bounds)</span>
+        <span class="stat-label">Bounding Box (Bounds)</span>
         <strong id="stat-bounds" class="small-code">--</strong>
       </div>
     </section>
 
-    <!-- KONTROL DÜĞMELERİ (Katman ve Bant Seçimi) -->
+    <!-- CONTROL BUTTONS (Layer and Polarization Band Selection) -->
     <section class="controls">
       <div class="control-group">
-        <span class="group-title">1. Katman Seçin:</span>
+        <span class="group-title">1. Select Layer:</span>
         <div class="btn-row">
-          <button class="btn layer-btn active" data-layer="radar">Radar Görüntüsü (dB)</button>
-          <button class="btn layer-btn" data-layer="water">Su Maskesi</button>
-          <button class="btn layer-btn" data-layer="change">Değişim Haritası</button>
+          <button class="btn layer-btn active" data-layer="radar">Radar Backscatter (dB)</button>
+          <button class="btn layer-btn" data-layer="water">Water Mask</button>
+          <button class="btn layer-btn" data-layer="change">Change Map</button>
         </div>
       </div>
 
       <div class="control-group" id="band-group">
-        <span class="group-title">2. Polarizasyon Bandı:</span>
+        <span class="group-title">2. Polarization Band:</span>
         <div class="btn-row">
-          <button class="btn band-btn active" data-band="HH">HH (Yüzey Pürüzlülüğü)</button>
-          <button class="btn band-btn" data-band="HV">HV (Bitki ve Yapı)</button>
+          <button class="btn band-btn active" data-band="HH">HH (Surface Roughness)</button>
+          <button class="btn band-btn" data-band="HV">HV (Vegetation & Structure)</button>
         </div>
       </div>
     </section>
 
-    <!-- GÖRSEL KARŞILAŞTIRMA ALANI -->
+    <!-- VISUAL COMPARISON VIEWER -->
     <section class="viewer-card">
       <div class="viewer-header">
-        <span id="current-view-title">Aktif Görünüm: Radar Görüntüsü (HH Bandı) — Önce / Sonra Karşılaştırması</span>
+        <span id="current-view-title">Active View: Radar Backscatter (HH Band) — Before / After Comparison</span>
       </div>
 
-      <!-- Before / After Slider (Radar ve Su Maskesi Katmanlarında Aktif) -->
+      <!-- Before / After Slider (Active for Radar and Water Mask Layers) -->
       <div id="slider-container">
         <div class="date-labels">
-          <span class="date-pill left" id="label-date1">1. Tarih: --</span>
-          <span class="date-pill right" id="label-date2">2. Tarih: --</span>
+          <span class="date-pill left" id="label-date1">Date 1: --</span>
+          <span class="date-pill right" id="label-date2">Date 2: --</span>
         </div>
         <img-comparison-slider class="comparison-slider">
-          <img slot="first" id="img-before" src="data/date1_HH.png" alt="Tarih 1 Görüntüsü" />
-          <img slot="second" id="img-after" src="data/date2_HH.png" alt="Tarih 2 Görüntüsü" />
+          <img slot="first" id="img-before" src="data/date1_HH.png" alt="Date 1 Radar Image" />
+          <img slot="second" id="img-after" src="data/date2_HH.png" alt="Date 2 Radar Image" />
         </img-comparison-slider>
-        <p class="slider-hint">↔ Ortadaki çizgiyi sağa/sola kaydırarak iki tarih arasındaki farkı inceleyin.</p>
+        <p class="slider-hint">↔ Drag the center slider left or right to compare surface changes between the two dates.</p>
       </div>
 
-      <!-- Tekli Harita Görünümü (Değişim Haritası Katmanında Aktif) -->
+      <!-- Single Map View (Active for Change Map Layer) -->
       <div id="single-container" class="hidden">
-        <img id="img-change" src="data/change_map.png" alt="Değişim Haritası" />
-        <p class="slider-hint">İki tarih arasındaki net su artışı ve çekilme alanlarını gösteren birleşik değişim haritası.</p>
+        <img id="img-change" src="data/change_map.png" alt="Surface Water Change Map" />
+        <p class="slider-hint">Combined change detection map showing newly flooded/inundated pixels vs. receded water areas.</p>
       </div>
 
-      <!-- RENK AÇIKLAMASI (LEGEND) -->
+      <!-- COLOR LEGEND -->
       <div class="legend">
         <div class="legend-item">
           <span class="swatch swatch-dark"></span>
-          <span><strong>Koyu / Siyah (-25 ile -18 dB):</strong> Durgun Su Yüzeyi</span>
+          <span><strong>Dark / Black (-25 to -18 dB):</strong> Calm Open Water</span>
         </div>
         <div class="legend-item">
           <span class="swatch swatch-bright"></span>
-          <span><strong>Açık Gri / Beyaz (-10 ile 0 dB):</strong> Kara, Bitki Örtüsü ve Yapılar</span>
+          <span><strong>Light Gray / White (-10 to 0 dB):</strong> Land, Vegetation & Urban</span>
         </div>
         <div class="legend-item">
           <span class="swatch swatch-flood"></span>
-          <span><strong>Mavi / Kırmızı (Değişim):</strong> Yeni Su Artışı / Taşkın Alanı</span>
+          <span><strong>Red / Blue (Change):</strong> Water Gain / Newly Flooded Area</span>
         </div>
         <div class="legend-item">
           <span class="swatch swatch-recede"></span>
-          <span><strong>Sarı / Turuncu (Değişim):</strong> Suyun Çekildiği Alan</span>
+          <span><strong>Yellow / Orange (Change):</strong> Water Loss / Receded Area</span>
         </div>
       </div>
     </section>
 
-    <!-- MERAL'İN METİN BÖLÜMLERİ -->
+    <!-- MERAL'S SCIENCE & STORY CARDS -->
     <section class="info-grid">
       <article class="info-card">
-        <h2>📡 Radar Nasıl Görür?</h2>
-        <!-- MERAL BURAYA YAZACAK (Radar nasıl görür kutusu) -->
+        <h2>📡 How Does Radar See Water?</h2>
+        <!-- MERAL WILL WRITE HERE ("How radar sees" box in English) -->
         <p>
-          Optik uyduların aksine SAR (Yapay Açıklıklı Radar) kendi mikrodalga sinyalini gönderir; bu sayede <strong>gece karanlığında ve yoğun bulutlu havalarda</strong> bile kesintisiz görüntü alır. Durgun su yüzeyleri radar sinyalini ayna gibi uydudan uzağa yansıttığı için (speküler yansıma) görüntülerde <strong>çok koyu (düşük geri saçılım / dB)</strong> görünür. <strong>HH polarizasyonu</strong> su ve yüzey pürüzlülüğüne doğrudan duyarlıyken, <strong>HV polarizasyonu</strong> bitki örtüsü yapısını ve su basmış bitki alanlarını ayırt etmede kullanılır.
+          Unlike optical sensors, Synthetic Aperture Radar (SAR) transmits its own microwave pulses, operating <strong>day and night through heavy clouds and rain</strong>. Calm water surfaces act like a mirror (specular reflection), bouncing radar energy away from the satellite and appearing <strong>very dark (low backscatter in dB)</strong>. <strong>HH polarization</strong> is highly sensitive to surface roughness and open water, while <strong>HV polarization</strong> responds to vegetation structure and flooded vegetation canopies.
         </p>
       </article>
 
       <article class="info-card">
-        <h2>🌍 Bölge Tanıtımı ve Yöntem Özeti</h2>
-        <!-- MERAL BURAYA YAZACAK (Bölge tanıtımı ve yöntem özeti) -->
+        <h2>🌍 Study Area & Methodology</h2>
+        <!-- MERAL WILL WRITE HERE (Region introduction & method summary in English) -->
         <p>
-          <strong>Bölge:</strong> ASF Vertex üzerinden seçilen çalışma alanında iki farklı tarihteki aynı iz/çerçeve (track/frame) GCOV verileri incelenmiştir.<br><br>
-          <strong>Yöntem:</strong> HDF5 formatındaki `science/LSAR/GCOV/grids/frequencyA/` altından okunan HHHH ve HVHV bantları `10 * log10` dönüşümüyle desibel (dB) ölçeğine çevrilmiş, benek (speckle) gürültüsü filtrelenmiş ve Otsu/dB eşikleme yöntemiyle (~ -19 dB) su maskeleri ve piksel bazlı alan (km²) değişimleri hesaplanmıştır.
+          <strong>Study Region:</strong> Dual-date NISAR GCOV scenes from the same track/frame and orbit direction were selected via ASF Vertex to ensure co-registered grid alignment.<br><br>
+          <strong>Methodology:</strong> `HHHH` and `HVHV` backscatter grids under `science/LSAR/GCOV/grids/frequencyA/` were extracted using `h5py`, converted to decibels (`10 * log10`), smoothed with a speckle filter, and classified into binary water masks (~ -19 dB / Otsu threshold) to compute total water area (km²) and net percentage change.
         </p>
       </article>
 
       <article class="info-card full-width">
-        <h2>📊 Bulgular, Yorum ve Sınırlılıklar</h2>
-        <!-- MERAL BURAYA YAZACAK (Yorum, sınırlılıklar ve gelecek uygulamalar) -->
+        <h2>📊 Findings, Limitations & Future Applications</h2>
+        <!-- MERAL WILL WRITE HERE (Interpretation, limitations & future applications in English) -->
         <p>
-          <strong>Gözlenen Değişim ve Nedenler:</strong> İki tarih arasında tespit edilen su alanı değişimi; bölgesel yağış rejimi, taşkın dinamikleri veya rezervuar/baraj su yönetimiyle doğrudan ilişkilidir.<br><br>
-          <strong>Sınırlılıklar:</strong> Analizde iki tarihli sahne ve global eşik değeri kullanılmıştır. SAR görüntülerinde bulut etkisi olmasa da, şiddetli rüzgâr su yüzeyinde dalgalanma (pürüzlülük) yaratarak geri saçılımı artırabilir ve su maskesini etkileyebilir; ayrıca sık ormanlık alanlarda çift sekme (double-bounce) etkisi farklı davranış gösterebilir.<br><br>
-          <strong>Gelecek Uygulamaları:</strong> NISAR uydusunun 12 günlük düzenli tekrar süresi sayesinde bu sistem; otomatik sel erken uyarı sistemlerinde, baraj doluluk ve kuraklık izlemede ve tarımsal su yönetiminde gerçek zamanlı karar destek aracı olarak kullanılabilir.
+          <strong>Interpretation:</strong> Observed changes in surface water extent correlate with regional precipitation events, floodplain inundation, seasonal hydrology, or reservoir management.<br><br>
+          <strong>Limitations:</strong> This rapid analysis relies on dual-date thresholding. While SAR is unaffected by cloud cover, strong winds can roughen open water surfaces (increasing backscatter and affecting water mask accuracy), and dense forest canopies can induce double-bounce scattering.<br><br>
+          <strong>Future Impact:</strong> Leveraging NISAR's 12-day repeat cycle, FloodWatch can scale into an automated early flood warning tool, drought/reservoir tracker, and agricultural water management system.
         </p>
       </article>
     </section>
   </main>
 
   <footer class="footer">
-    <p>FloodWatch • Veri: NASA / ISRO NISAR GCOV (ASF DAAC Vertex) • Ekip: Doğaca (Veri/Analiz), Meral (Bilim/Hikâye), Hasan (Web)</p>
+    <p>FloodWatch • Data Source: NASA / ISRO NISAR GCOV (ASF DAAC Vertex) • Team: Doğaca (Data/Analysis), Meral (Science/Story), Hasan (Web)</p>
   </footer>
 
   <script src="script.js"></script>
