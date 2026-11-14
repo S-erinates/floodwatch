@@ -521,6 +521,85 @@ input:focus-visible {
   display: none !important;
 }
 
+/* Time Series Chart */
+.ts-title {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+.ts-wrap {
+  position: relative;
+}
+
+#ts-chart {
+  width: 100%;
+}
+
+.ts-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.ts-grid { stroke: rgba(148, 163, 184, 0.12); stroke-width: 1; }
+.ts-baseline { stroke: rgba(148, 163, 184, 0.4); stroke-width: 1; }
+.ts-axis { fill: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; }
+.ts-label { fill: var(--text-primary); font-family: var(--font-mono); font-size: 12px; font-weight: 600; }
+.ts-line { fill: none; stroke: var(--cyan); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ts-area { fill: rgba(56, 189, 248, 0.1); }
+.ts-dot { fill: var(--cyan); stroke: #0b1222; stroke-width: 2; }
+.ts-hit { fill: transparent; cursor: pointer; outline: none; }
+.ts-hit:focus-visible { stroke: var(--cyan); stroke-width: 2; }
+
+.ts-tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 14px));
+  pointer-events: none;
+  background: rgba(6, 11, 20, 0.95);
+  border: 1px solid var(--border-glow);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ts-tooltip strong { color: var(--text-primary); }
+
+.ts-details {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.ts-details summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.ts-table {
+  margin-top: 0.5rem;
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ts-table th,
+.ts-table td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.ts-table th { color: var(--text-secondary); font-weight: 600; }
+.ts-table td { color: var(--text-primary); }
+
 /* Legend */
 .legend {
   display: grid;
@@ -551,11 +630,13 @@ input:focus-visible {
 .swatch-bright { background: #e2e8f0; }
 .swatch-flood { background: linear-gradient(135deg, #ef4444 50%, #38bdf8 50%); }
 .swatch-recede { background: #f59e0b; }
+.swatch-nodata { background: repeating-linear-gradient(45deg, #475569 0 3px, #1e293b 3px 6px); }
 
 /* Science & Story Cards */
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  /* 2 sütun: 3 sütunda sağda boş bir alan kalıyordu */
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
   gap: 1.1rem;
 }
 
