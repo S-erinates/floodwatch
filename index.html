@@ -8,9 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Before/After Slider -->
-  <script defer src="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/index.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/styles.css" />
+  <!-- Before/After Slider (sabit sürüm: CDN'de yeni sürüm çıkınca site bozulmasın) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/img-comparison-slider@8.0.6/dist/index.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/img-comparison-slider@8.0.6/dist/styles.css" />
   <!-- Leaflet Interactive Map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -35,7 +35,6 @@
   <header class="hero">
     <div class="hero-chip">NASA SPACE APPS CHALLENGE • ASF DAAC VERTEX</div>
     <h1>All-Weather Radar Surface Water & Flood Intelligence</h1>
-    <!-- MERAL WILL WRITE HERE (One-sentence project summary) -->
     <p id="project-subtitle">
       Tracking dynamic inundation, flood expansion, and reservoir changes using dual-polarization (HH/HV) NISAR L-band Synthetic Aperture Radar—penetrating clouds, rain, and darkness.
     </p>
@@ -59,7 +58,7 @@
           <span class="stat-icon">🌊</span>
         </div>
         <strong id="stat-area1">-- km²</strong>
-        <div class="mini-progress"><div id="bar-area1" class="mini-fill blue" style="width: 45%"></div></div>
+        <div class="mini-progress"><div id="bar-area1" class="mini-fill blue" style="width: 0%"></div></div>
       </div>
 
       <div class="stat-card">
@@ -68,7 +67,7 @@
           <span class="stat-icon">⚠️</span>
         </div>
         <strong id="stat-area2">-- km²</strong>
-        <div class="mini-progress"><div id="bar-area2" class="mini-fill red" style="width: 75%"></div></div>
+        <div class="mini-progress"><div id="bar-area2" class="mini-fill red" style="width: 0%"></div></div>
       </div>
 
       <div class="stat-card highlight">
@@ -113,61 +112,48 @@
         </div>
       </div>
 
-      <!-- Interactive Otsu / dB Threshold Simulator Bar -->
-<div class="simulator-bar">
-  <div class="sim-info">
-    <span class="sim-badge">
-      HH THRESHOLD SENSITIVITY PREVIEW
-    </span>
+      <!-- dB Threshold Sensitivity Preview -->
+      <div class="simulator-bar">
+        <div class="sim-info">
+          <span class="sim-badge">HH THRESHOLD SENSITIVITY PREVIEW</span>
+          <span id="threshold-readout">
+            HH Backscatter Cutoff:
+            <strong id="threshold-value">-19.0 dB</strong>
+          </span>
+        </div>
 
-    <span id="threshold-readout">
-      HH Backscatter Cutoff:
-      <strong id="threshold-value">-19.0 dB</strong>
-    </span>
-  </div>
+        <div class="sim-controls">
+          <label for="threshold-slider">-25 dB <small>Strict</small></label>
+          <input
+            type="range"
+            id="threshold-slider"
+            min="-25"
+            max="-13"
+            step="0.5"
+            value="-19"
+            aria-label="HH backscatter threshold preview"
+          >
+          <label for="threshold-slider">-13 dB <small>Relaxed</small></label>
+          <span class="sim-est" id="sim-est-area">
+            Analysis rule: HH &lt; -19 dB and HV &lt; -24 dB
+          </span>
+        </div>
 
-  <div class="sim-controls">
-    <label for="threshold-slider">
-      -25 dB
-      <small>Strict</small>
-    </label>
-
-    <input
-      type="range"
-      id="threshold-slider"
-      min="-25"
-      max="-13"
-      step="0.5"
-      value="-19"
-      aria-label="HH backscatter threshold preview"
-    >
-
-    <label for="threshold-slider">
-      -13 dB
-      <small>Relaxed</small>
-    </label>
-
-    <span class="sim-est" id="sim-est-area">
-      Analysis rule:
-      HH &lt; -19 dB and HV &lt; -24 dB
-    </span>
-  </div>
-
-  <p class="sim-disclaimer">
-    Visual sensitivity preview only. Valid water-area statistics
-    are calculated by the Python processing pipeline.
-  </p>
-</div>
+        <p class="sim-disclaimer">
+          Visual sensitivity preview only. Valid water-area statistics
+          are calculated by the Python processing pipeline.
+        </p>
+      </div>
     </section>
 
     <!-- MAIN VISUALIZATION VIEWPORT -->
     <section class="viewer-card">
       <div class="viewer-header">
         <div id="current-view-title">ACTIVE FEED: RADAR BACKSCATTER (HH BAND)</div>
-        <!-- Live Cursor Telemetry Readout -->
+        <!-- Live Cursor Readout -->
         <div class="cursor-telemetry" id="cursor-telemetry">
           <span>LAT/LON: <b id="cur-coords">-- , --</b></span>
-          <span>EST. σ°: <b id="cur-db">-- dB</b></span>
+          <span>σ°: <b id="cur-db">-- dB</b></span>
           <span>CLASS: <b id="cur-class" class="tag-neutral">HOVER IMAGE</b></span>
         </div>
       </div>
@@ -181,19 +167,19 @@
           </div>
           <div class="image-stage" id="interactive-stage">
             <img-comparison-slider class="comparison-slider">
-              <img slot="first" id="img-before" src="data/date1_HH.png" alt="Date 1 Radar Image" />
-              <img slot="second" id="img-after" src="data/date2_HH.png" alt="Date 2 Radar Image" />
+              <img slot="first" id="img-before" src="data/before_HH.png" alt="Before: HH radar backscatter" />
+              <img slot="second" id="img-after" src="data/after_HH.png" alt="After: HH radar backscatter" />
             </img-comparison-slider>
           </div>
-          <p class="slider-hint">↔ Slide the divider to compare Date 1 vs. Date 2 • Move cursor over radar to inspect backscatter telemetry.</p>
+          <p class="slider-hint">↔ Slide the divider to compare the before and after scenes • Move the cursor over the image to read coordinates.</p>
         </div>
 
         <!-- Single View (Change Map) -->
         <div id="single-container" class="hidden">
           <div class="image-stage" id="single-stage">
-            <img id="img-change" src="data/change_map.png" alt="Surface Water Change Map" />
+            <img id="img-change" src="data/change_map.png" alt="Surface water change map" />
           </div>
-          <p class="slider-hint">Pixel-wise anomaly map highlighting newly inundated zones vs. water recession.</p>
+          <p class="slider-hint">Pixel-wise change map highlighting newly inundated zones vs. water recession.</p>
         </div>
       </div>
 
@@ -202,20 +188,20 @@
         <div class="map-toolbar">
           <span>Overlay Layer on Satellite Basemap:</span>
           <div class="map-opacity-ctrl">
-            <label for="map-opacity">Radar Opacity:</label>
+            <label for="map-opacity">Overlay Opacity:</label>
             <input type="range" id="map-opacity" min="0" max="1" step="0.05" value="0.8" />
             <span id="map-opacity-val">80%</span>
           </div>
         </div>
         <div id="leaflet-map"></div>
-        <p class="slider-hint">Georeferenced using `bounds` from `stats.json` over Esri World Imagery satellite tiles.</p>
+        <p class="slider-hint">Georeferenced using <code>bounds</code> from <code>stats.json</code> over Esri World Imagery satellite tiles.</p>
       </div>
 
-      <!-- SCIENTIFIC COLOR LEGEND -->
+      <!-- SCIENTIFIC COLOR LEGEND (renkler change_map.png ile aynı olmalı) -->
       <div class="legend">
         <div class="legend-item">
           <span class="swatch swatch-dark"></span>
-          <span><strong>Specular Dark (-25 to -18 dB):</strong> Smooth Open Water</span>
+          <span><strong>Dark (HH &lt; -19 dB):</strong> Smooth Open Water</span>
         </div>
         <div class="legend-item">
           <span class="swatch swatch-bright"></span>
@@ -223,52 +209,49 @@
         </div>
         <div class="legend-item">
           <span class="swatch swatch-flood"></span>
-          <span><strong>Red / Cyan Anomaly:</strong> Newly Flooded / Inundation Gain</span>
+          <span><strong>Water Gain:</strong> Newly Flooded / Inundation Gain</span>
         </div>
         <div class="legend-item">
           <span class="swatch swatch-recede"></span>
-          <span><strong>Amber / Yellow:</strong> Receded Water / Drawdown</span>
+          <span><strong>Water Loss:</strong> Receded Water / Drawdown</span>
         </div>
       </div>
     </section>
 
-    <!-- MERAL'S SCIENTIFIC NARRATIVE & ANALYSIS CARDS -->
+    <!-- SCIENTIFIC NARRATIVE & ANALYSIS CARDS -->
     <section class="info-grid">
       <article class="info-card">
         <div class="card-kicker">RADAR PHYSICS</div>
         <h2>📡 How Does Radar See Water?</h2>
-        <!-- MERAL WILL WRITE HERE -->
         <p id="meral-radar-box">
-          Unlike optical satellites blinded by cloud cover or night, Synthetic Aperture Radar (SAR) transmits active L-band microwave pulses (~24 cm wavelength). Calm water surfaces act as a mirror (<strong>specular reflection</strong>), deflecting radar energy away from the sensor so water pixels appear <strong>extremely dark (low dB)</strong>. <strong>HH polarization</strong> captures surface roughness variations, while <strong>HV cross-polarization</strong> penetrates vegetation to detect flooded forests and agricultural wetlands.
+          Unlike optical satellites blinded by cloud cover or night, Synthetic Aperture Radar (SAR) transmits active L-band microwave pulses (~24 cm wavelength). Calm water surfaces act as a mirror (<strong>specular reflection</strong>), deflecting radar energy away from the sensor so water pixels appear <strong>extremely dark (low dB)</strong>. <strong>HH polarization</strong> captures surface roughness variations, while <strong>HV cross-polarization</strong> is sensitive to volume scattering in vegetation, helping separate open water from flooded forests and agricultural wetlands.
         </p>
       </article>
 
       <article class="info-card">
         <div class="card-kicker">REGIONAL CONTEXT & PIPELINE</div>
         <h2>🌍 Study Area & Methodology</h2>
-        <!-- MERAL WILL WRITE HERE -->
         <p id="meral-method-box">
-          <strong>Study Area:</strong> Co-registered dual-date NISAR GCOV scenes (matching track, frame, and orbit direction) were retrieved via ASF Vertex.<br><br>
-          <strong>Processing Pipeline:</strong> Using Python (`h5py`), `HHHH` and `HVHV` covariance grids under `science/LSAR/GCOV/grids/frequencyA/` were converted to decibels (`10 * log10`), filtered for speckle noise, and segmented via Otsu thresholding (~ -19 dB) to quantify exact water surface area (km²) and net change.
+          <strong>Study Area:</strong> Inner Niger Delta, Mali — one of Africa's largest seasonal floodplains. Two co-registered NISAR GCOV scenes (matching track, frame, and orbit direction), acquired on 17 July 2026 (pre-flood baseline) and 21 October 2026 (flood season), were retrieved via ASF Vertex.<br><br>
+          <strong>Processing Pipeline:</strong> Using Python (<code>h5py</code>), the <code>HHHH</code> and <code>HVHV</code> covariance grids under <code>science/LSAR/GCOV/grids/frequencyA/</code> were converted to decibels (<code>10 * log10</code>), filtered for speckle noise, and classified as open water where <strong>HH &lt; -19 dB and HV &lt; -24 dB</strong>. Water area (km²) and net change were then computed from the classified pixels.
         </p>
       </article>
 
       <article class="info-card full-width">
         <div class="card-kicker">INTERPRETATION & ROADMAP</div>
         <h2>📊 Hydrological Findings, Limitations & Future Impact</h2>
-        <!-- MERAL WILL WRITE HERE -->
         <div class="three-col-text" id="meral-interpretation-box">
           <div>
             <h3>Hydrological Drivers</h3>
-            <p>Observed surface water expansion/recession aligns with extreme precipitation events, floodplain overflow, seasonal snowmelt, or dam reservoir release operations.</p>
+            <p>The Inner Niger Delta floods every year when rainy-season runoff from the Guinean highlands (July–September) travels down the Niger and Bani rivers, overtopping their banks and filling the floodplain, with peak extent typically in October–November. The roughly threefold increase in open water between July and October is consistent with this annual flood pulse.</p>
           </div>
           <div>
             <h3>Scientific Limitations</h3>
-            <p>Single-threshold binary classification across two dates can be influenced by wind-induced capillary waves (which roughen water and raise dB backscatter) or double-bounce scattering in dense flooded forests.</p>
+            <p>Fixed-threshold binary classification across two dates can be influenced by wind-induced capillary waves (which roughen water and raise backscatter) and by double-bounce scattering in flooded vegetation, which makes partly submerged areas appear bright and can lead to underestimating flooded area.</p>
           </div>
           <div>
             <h3>NISAR Future Applications</h3>
-            <p>With NISAR's systematic 12-day global repeat cycle, FloodWatch scales into an operational early flood warning system, drought reservoir monitor, and precision irrigation planner.</p>
+            <p>With NISAR's systematic 12-day repeat cycle, FloodWatch could scale into an operational early flood warning system, drought reservoir monitor, and irrigation planning tool.</p>
           </div>
         </div>
       </article>
