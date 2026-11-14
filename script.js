@@ -1,267 +1,404 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FloodWatch // NISAR L-Band SAR Telemetry & Inundation Intelligence</title>
-  <!-- Google Fonts: Space Grotesk & JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Before/After Slider (sabit sürüm: CDN'de yeni sürüm çıkınca site bozulmasın) -->
-  <script defer src="https://cdn.jsdelivr.net/npm/img-comparison-slider@8.0.6/dist/index.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/img-comparison-slider@8.0.6/dist/styles.css" />
-  <!-- Leaflet Interactive Map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <div class="bg-grid"></div>
+// FloodWatch Mission Control - script.js
+// Static front-end only. Works with GitHub Pages and data/stats.json.
 
-  <!-- TOP TELEMETRY NAVBAR -->
-  <nav class="topbar">
-    <div class="brand">
-      <span class="pulse-dot"></span>
-      <span class="brand-name">FLOODWATCH</span>
-      <span class="brand-tag">NISAR L-BAND GCOV TELEMETRY</span>
-    </div>
-    <div class="topbar-actions">
-      <div class="severity-badge" id="severity-badge">STATUS: ANALYZING...</div>
-      <button class="action-btn" id="btn-export" title="Export PDF / Print Briefing">🖨️ Export Briefing</button>
-    </div>
-  </nav>
+const DEFAULT_BOUNDS = [
+  [14.493970156609581, -5.00946245265618],
+  [15.507051854135497, -3.995937159485534]
+];
 
-  <header class="hero">
-    <div class="hero-chip">NASA SPACE APPS CHALLENGE • ASF DAAC VERTEX</div>
-    <h1>All-Weather Radar Surface Water & Flood Intelligence</h1>
-    <p id="project-subtitle">
-      Tracking dynamic inundation, flood expansion, and reservoir changes using dual-polarization (HH/HV) NISAR L-band Synthetic Aperture Radar—penetrating clouds, rain, and darkness.
-    </p>
-  </header>
+const DEFAULT_STATS = {
+  region: "Inner Niger Delta, Mali",
+  before_date: "2026-07-17",
+  after_date: "2026-10-21",
+  water_before_km2: 1035.2,  
+  water_after_km2: 3129.9,
+  water_gain_km2: 2360.5,
+  water_loss_km2: 265.8,
+  water_change_pct: 202.3,
+  hh_threshold_db: -19,
+  hv_threshold_db: -24,
+  bounds: DEFAULT_BOUNDS
+};
 
-  <main class="container">
-    <!-- ANIMATED TELEMETRY KPI ROW -->
-    <section class="stats-bar">
-      <div class="stat-card">
-        <div class="stat-top">
-          <span class="stat-label">Target Region & Orbit</span>
-          <span class="stat-icon">🛰️</span>
-        </div>
-        <strong id="stat-region">Loading...</strong>
-        <span class="stat-sub" id="stat-bounds">Bounds: --</span>
-      </div>
+let currentMode = "slider";
+let currentLayer = "radar";
+let currentBand = "HH";
+let statsData = { ...DEFAULT_STATS };
 
-      <div class="stat-card">
-        <div class="stat-top">
-          <span class="stat-label" id="label-stat-date1">Baseline Water Extent</span>
-          <span class="stat-icon">🌊</span>
-        </div>
-        <strong id="stat-area1">-- km²</strong>
-        <div class="mini-progress"><div id="bar-area1" class="mini-fill blue" style="width: 0%"></div></div>
-      </div>
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => document.querySelectorAll(selector);
 
-      <div class="stat-card">
-        <div class="stat-top">
-          <span class="stat-label" id="label-stat-date2">Post-Event Water Extent</span>
-          <span class="stat-icon">⚠️</span>
-        </div>
-        <strong id="stat-area2">-- km²</strong>
-        <div class="mini-progress"><div id="bar-area2" class="mini-fill red" style="width: 0%"></div></div>
-      </div>
+const imgBefore = $("#img-before");
+const imgAfter = $("#img-after");
+const imgChange = $("#img-change");
+const viewportSlider = $("#viewport-slider");
+const viewportMap = $("#viewport-map");
+const sliderContainer = $("#slider-container");
+const singleContainer = $("#single-container");
+const bandGroup = $("#band-group");
+const viewTitle = $("#current-view-title");
 
-      <div class="stat-card highlight">
-        <div class="stat-top">
-          <span class="stat-label">Net Surface Change</span>
-          <span class="stat-icon">📈</span>
-        </div>
-        <strong id="stat-change">--%</strong>
-        <span class="stat-sub" id="stat-diff-km2">Delta: -- km²</span>
-      </div>
-    </section>
+let map = null;
+let mapOverlay = null;
+let overlayRequestId = 0; // eski (geç yüklenen) overlay isteklerini yok saymak için
 
-    <!-- MAIN MISSION CONTROL DECK -->
-    <section class="control-deck">
-      <div class="deck-row">
-        <!-- View Mode Switcher (Slider vs Geo-Map) -->
-        <div class="control-group">
-          <span class="group-title">VIEW MODE</span>
-          <div class="btn-row">
-            <button class="btn mode-btn active" data-mode="slider">🖼️ Split Curtain</button>
-            <button class="btn mode-btn" data-mode="map">🌍 Geo-Map Overlay</button>
-          </div>
-        </div>
+// ---------- Yardımcılar ----------
 
-        <!-- Layer Switcher -->
-        <div class="control-group">
-          <span class="group-title">DATA LAYER</span>
-          <div class="btn-row">
-            <button class="btn layer-btn active" data-layer="radar">📡 Radar (dB)</button>
-            <button class="btn layer-btn" data-layer="water">💧 Water Mask</button>
-            <button class="btn layer-btn" data-layer="change">🔥 Change Map</button>
-          </div>
-        </div>
+// Eleman yoksa hata fırlatmadan metin ata
+function setText(selector, text) {
+  const el = typeof selector === "string" ? $(selector) : selector;
+  if (el) el.textContent = text;
+}
 
-        <!-- Polarization Switcher -->
-        <div class="control-group" id="band-group">
-          <span class="group-title">POLARIZATION</span>
-          <div class="btn-row">
-            <button class="btn band-btn active" data-band="HH">HH (Surface)</button>
-            <button class="btn band-btn" data-band="HV">HV (Canopy)</button>
-          </div>
-        </div>
-      </div>
+// null, undefined ve boş string'i atlar (Number(null) === 0 ve Number("") === 0 hatasını önler)
+function num(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
 
-      <!-- dB Threshold Sensitivity Preview -->
-      <div class="simulator-bar">
-        <div class="sim-info">
-          <span class="sim-badge">HH THRESHOLD SENSITIVITY PREVIEW</span>
-          <span id="threshold-readout">
-            HH Backscatter Cutoff:
-            <strong id="threshold-value">-19.0 dB</strong>
-          </span>
-        </div>
+function isValidPair(pair) {
+  return Array.isArray(pair) && pair.length === 2 && pair.every(v => Number.isFinite(Number(v)));
+}
 
-        <div class="sim-controls">
-          <label for="threshold-slider">-25 dB <small>Strict</small></label>
-          <input
-            type="range"
-            id="threshold-slider"
-            min="-25"
-            max="-13"
-            step="0.5"
-            value="-19"
-            aria-label="HH backscatter threshold preview"
-          >
-          <label for="threshold-slider">-13 dB <small>Relaxed</small></label>
-          <span class="sim-est" id="sim-est-area">
-            Analysis rule: HH &lt; -19 dB and HV &lt; -24 dB
-          </span>
-        </div>
+// Her zaman [[south, west], [north, east]] sırasında, sayısal değerlerle döner
+function normalizeBounds(raw) {
+  let a, b;
+  if (Array.isArray(raw) && raw.length === 2 && isValidPair(raw[0]) && isValidPair(raw[1])) {
+    a = raw[0].map(Number);
+    b = raw[1].map(Number);
+  } else if (raw && [raw.south, raw.west, raw.north, raw.east].every(v => Number.isFinite(Number(v)))) {
+    a = [Number(raw.south), Number(raw.west)];
+    b = [Number(raw.north), Number(raw.east)];
+  } else {
+    return DEFAULT_BOUNDS;
+  }
+  return [
+    [Math.min(a[0], b[0]), Math.min(a[1], b[1])],
+    [Math.max(a[0], b[0]), Math.max(a[1], b[1])]
+  ];
+}
 
-        <p class="sim-disclaimer">
-          Visual sensitivity preview only. Valid water-area statistics
-          are calculated by the Python processing pipeline.
-        </p>
-      </div>
-    </section>
+function escapeXML(text) {
+  return String(text).replace(/[<>&'"]/g, c => (
+    { "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[c]
+  ));
+}
 
-    <!-- MAIN VISUALIZATION VIEWPORT -->
-    <section class="viewer-card">
-      <div class="viewer-header">
-        <div id="current-view-title">ACTIVE FEED: RADAR BACKSCATTER (HH BAND)</div>
-        <!-- Live Cursor Readout -->
-        <div class="cursor-telemetry" id="cursor-telemetry">
-          <span>LAT/LON: <b id="cur-coords">-- , --</b></span>
-          <span>σ°: <b id="cur-db">-- dB</b></span>
-          <span>CLASS: <b id="cur-class" class="tag-neutral">HOVER IMAGE</b></span>
-        </div>
-      </div>
+function createPlaceholderSVG(title, subtitle, isAfter, mode) {
+  const bg = mode === "water" ? "#040812" : mode === "change" ? "#090f1d" : "#111827";
+  const waterColor = mode === "water" ? "#38bdf8" : mode === "change" ? "#f43f5e" : "#030712";
+  const rx = isAfter ? 210 : 120;
+  const ry = isAfter ? 145 : 85;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+    <rect width="100%" height="100%" fill="${bg}"/>
+    <g stroke="#1e293b" stroke-width="1">
+      <line x1="0" y1="135" x2="960" y2="135"/><line x1="0" y1="270" x2="960" y2="270"/><line x1="0" y1="405" x2="960" y2="405"/>
+      <line x1="240" y1="0" x2="240" y2="540"/><line x1="480" y1="0" x2="480" y2="540"/><line x1="720" y1="0" x2="720" y2="540"/>
+    </g>
+    <ellipse cx="480" cy="280" rx="${rx + 45}" ry="${ry + 30}" fill="${mode === "change" ? "#38bdf8" : waterColor}" opacity="0.28"/>
+    <ellipse cx="480" cy="280" rx="${rx}" ry="${ry}" fill="${waterColor}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="32" y="46" fill="#38bdf8" font-family="monospace" font-size="22" font-weight="bold">${escapeXML(title)}</text>
+    <text x="32" y="78" fill="#94a3b8" font-family="monospace" font-size="15">DEMO PLACEHOLDER • ${escapeXML(subtitle)}</text>
+  </svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
 
-      <!-- MODE 1: Split Curtain Comparison Slider -->
-      <div id="viewport-slider">
-        <div id="slider-container">
-          <div class="date-labels">
-            <span class="date-pill left" id="label-date1">BEFORE: --</span>
-            <span class="date-pill right" id="label-date2">AFTER: --</span>
-          </div>
-          <div class="image-stage" id="interactive-stage">
-            <img-comparison-slider class="comparison-slider">
-              <img slot="first" id="img-before" src="data/before_HH.png" alt="Before: HH radar backscatter" />
-              <img slot="second" id="img-after" src="data/after_HH.png" alt="After: HH radar backscatter" />
-            </img-comparison-slider>
-          </div>
-          <p class="slider-hint">↔ Slide the divider to compare the before and after scenes • Move the cursor over the image to read coordinates.</p>
-        </div>
+// Önce hafif WebP (data/web/), yoksa orijinal PNG, o da yoksa SVG placeholder
+function imageSources(name) {
+  return [`data/web/${name}.webp`, `data/${name}.png`];
+}
 
-        <!-- Single View (Change Map) -->
-        <div id="single-container" class="hidden">
-          <div class="image-stage" id="single-stage">
-            <img id="img-change" src="data/change_map.png" alt="Surface water change map" />
-          </div>
-          <p class="slider-hint">Pixel-wise change map highlighting newly inundated zones vs. water recession.</p>
-        </div>
-      </div>
+function setImageWithFallback(element, name, title, isAfter, mode) {
+  if (!element) return;
+  const sources = imageSources(name);
+  let i = 0;
+  element.onerror = function () {
+    i++;
+    if (i < sources.length) {
+      this.src = sources[i];
+    } else {
+      this.onerror = null;
+      this.src = createPlaceholderSVG(title, sources[sources.length - 1], isAfter, mode);
+    }
+  };
+  element.src = sources[0];
+}
 
-      <!-- MODE 2: Interactive Leaflet Satellite Geo-Map -->
-      <div id="viewport-map" class="hidden">
-        <div class="map-toolbar">
-          <span>Overlay Layer on Satellite Basemap:</span>
-          <div class="map-opacity-ctrl">
-            <label for="map-opacity">Overlay Opacity:</label>
-            <input type="range" id="map-opacity" min="0" max="1" step="0.05" value="0.8" />
-            <span id="map-opacity-val">80%</span>
-          </div>
-        </div>
-        <div id="leaflet-map"></div>
-        <p class="slider-hint">Georeferenced using <code>bounds</code> from <code>stats.json</code> over Esri World Imagery satellite tiles.</p>
-      </div>
+function activeMapName() {
+  if (currentLayer === "water") return "water_after";
+  if (currentLayer === "change") return "change_map";
+  return `after_${currentBand}`;
+}
 
-      <!-- SCIENTIFIC COLOR LEGEND (renkler change_map.png ile aynı olmalı) -->
-      <div class="legend">
-        <div class="legend-item">
-          <span class="swatch swatch-dark"></span>
-          <span><strong>Dark (HH &lt; -19 dB):</strong> Smooth Open Water</span>
-        </div>
-        <div class="legend-item">
-          <span class="swatch swatch-bright"></span>
-          <span><strong>High Backscatter (-10 to 0 dB):</strong> Rough Land / Urban / Canopy</span>
-        </div>
-        <div class="legend-item">
-          <span class="swatch swatch-flood"></span>
-          <span><strong>Water Gain:</strong> Newly Flooded / Inundation Gain</span>
-        </div>
-        <div class="legend-item">
-          <span class="swatch swatch-recede"></span>
-          <span><strong>Water Loss:</strong> Receded Water / Drawdown</span>
-        </div>
-      </div>
-    </section>
+// ---------- Eşik önizleme filtresi ----------
 
-    <!-- SCIENTIFIC NARRATIVE & ANALYSIS CARDS -->
-    <section class="info-grid">
-      <article class="info-card">
-        <div class="card-kicker">RADAR PHYSICS</div>
-        <h2>📡 How Does Radar See Water?</h2>
-        <p id="meral-radar-box">
-          Unlike optical satellites blinded by cloud cover or night, Synthetic Aperture Radar (SAR) transmits active L-band microwave pulses (~24 cm wavelength). Calm water surfaces act as a mirror (<strong>specular reflection</strong>), deflecting radar energy away from the sensor so water pixels appear <strong>extremely dark (low dB)</strong>. <strong>HH polarization</strong> captures surface roughness variations, while <strong>HV cross-polarization</strong> is sensitive to volume scattering in vegetation, helping separate open water from flooded forests and agricultural wetlands.
-        </p>
-      </article>
+function applyThresholdPreviewFilter() {
+  const slider = $("#threshold-slider");
+  let filter = "none";
+  if (currentLayer === "radar" && slider) {
+    const difference = Number(slider.value) - num(statsData.hh_threshold_db, -19);
+    if (Number.isFinite(difference) && difference !== 0) {
+      const contrast = Math.max(75, Math.min(135, 100 + difference * 3));
+      const brightness = Math.max(75, Math.min(125, 100 - difference * 2));
+      filter = `contrast(${contrast}%) brightness(${brightness}%)`;
+    }
+  }
+  if (imgBefore) imgBefore.style.filter = filter;
+  if (imgAfter) imgAfter.style.filter = filter;
+}
 
-      <article class="info-card">
-        <div class="card-kicker">REGIONAL CONTEXT & PIPELINE</div>
-        <h2>🌍 Study Area & Methodology</h2>
-        <p id="meral-method-box">
-          <strong>Study Area:</strong> Inner Niger Delta, Mali — one of Africa's largest seasonal floodplains. Two co-registered NISAR GCOV scenes (matching track, frame, and orbit direction), acquired on 17 July 2026 (pre-flood baseline) and 21 October 2026 (flood season), were retrieved via ASF Vertex.<br><br>
-          <strong>Processing Pipeline:</strong> Using Python (<code>h5py</code>), the <code>HHHH</code> and <code>HVHV</code> covariance grids under <code>science/LSAR/GCOV/grids/frequencyA/</code> were converted to decibels (<code>10 * log10</code>), filtered for speckle noise, and classified as open water where <strong>HH &lt; -19 dB and HV &lt; -24 dB</strong>. Water area (km²) and net change were then computed from the classified pixels.
-        </p>
-      </article>
+// ---------- Görüntüleyici ----------
 
-      <article class="info-card full-width">
-        <div class="card-kicker">INTERPRETATION & ROADMAP</div>
-        <h2>📊 Hydrological Findings, Limitations & Future Impact</h2>
-        <div class="three-col-text" id="meral-interpretation-box">
-          <div>
-            <h3>Hydrological Drivers</h3>
-            <p>The Inner Niger Delta floods every year when rainy-season runoff from the Guinean highlands (July–September) travels down the Niger and Bani rivers, overtopping their banks and filling the floodplain, with peak extent typically in October–November. The roughly threefold increase in open water between July and October is consistent with this annual flood pulse.</p>
-          </div>
-          <div>
-            <h3>Scientific Limitations</h3>
-            <p>Fixed-threshold binary classification across two dates can be influenced by wind-induced capillary waves (which roughen water and raise backscatter) and by double-bounce scattering in flooded vegetation, which makes partly submerged areas appear bright and can lead to underestimating flooded area.</p>
-          </div>
-          <div>
-            <h3>NISAR Future Applications</h3>
-            <p>With NISAR's systematic 12-day repeat cycle, FloodWatch could scale into an operational early flood warning system, drought reservoir monitor, and irrigation planning tool.</p>
-          </div>
-        </div>
-      </article>
-    </section>
-  </main>
+function updateViewer() {
+  if (currentLayer === "radar") {
+    sliderContainer?.classList.remove("hidden");
+    singleContainer?.classList.add("hidden");
+    bandGroup?.classList.remove("disabled-group");
 
-  <footer class="footer">
-    <p><strong>FLOODWATCH</strong> • NASA Space Apps Challenge • Data: NASA/ISRO NISAR GCOV via ASF DAAC Vertex • Team: <strong>Doğaca</strong> (SAR Data & Python), <strong>Meral</strong> (Science & Narrative), <strong>Hasan</strong> (Web Architecture & Visualization)</p>
-  </footer>
+    setImageWithFallback(imgBefore, `before_${currentBand}`,
+      `BEFORE (${statsData.before_date}) - ${currentBand}`, false, "radar");
+    setImageWithFallback(imgAfter, `after_${currentBand}`,
+      `AFTER (${statsData.after_date}) - ${currentBand}`, true, "radar");
+    setText(viewTitle, `ACTIVE FEED: RADAR BACKSCATTER (${currentBand} BAND)`);
+  } else if (currentLayer === "water") {
+    sliderContainer?.classList.remove("hidden");
+    singleContainer?.classList.add("hidden");
+    bandGroup?.classList.add("disabled-group");
 
-  <script src="script.js"></script>
-</body>
-</html>
+    setImageWithFallback(imgBefore, "water_before", "BEFORE WATER MASK", false, "water");
+    setImageWithFallback(imgAfter, "water_after", "AFTER WATER MASK", true, "water");
+    setText(viewTitle, "ACTIVE FEED: OPEN-WATER MASK COMPARISON");
+  } else {
+    sliderContainer?.classList.add("hidden");
+    singleContainer?.classList.remove("hidden");
+    bandGroup?.classList.add("disabled-group");
+
+    setImageWithFallback(imgChange, "change_map", "INNER NIGER DELTA WATER CHANGE", true, "change");
+    setText(viewTitle, "ACTIVE FEED: MULTI-TEMPORAL WATER CHANGE MAP");
+  }
+
+  // Radar'a geri dönüldüğünde slider değeri korunur; diğer katmanlarda filtre kaldırılır
+  applyThresholdPreviewFilter();
+
+  if (currentMode === "map") {
+    updateLeafletOverlay(activeMapName(), currentLayer);
+  }
+}
+
+// ---------- Harita ----------
+
+function initOrUpdateMap() {
+  if (typeof L === "undefined") {
+    alert("Harita kütüphanesi yüklenemedi. İnternet bağlantısını kontrol edin.");
+    return false;
+  }
+  const bounds = normalizeBounds(statsData.bounds);
+  if (!map) {
+    map = L.map("leaflet-map", { scrollWheelZoom: true });
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics",
+      maxZoom: 19
+    }).addTo(map);
+    map.fitBounds(bounds); // ilk görünüm (setView olmadan Leaflet hata verir)
+  }
+  // Kap gizliyken boyut 0 olabilir: önce boyutu güncelle, sonra sınırlara sığdır
+  setTimeout(() => {
+    map.invalidateSize();
+    map.fitBounds(bounds);
+  }, 120);
+  updateLeafletOverlay(activeMapName(), currentLayer);
+  return true;
+}
+
+function updateLeafletOverlay(name, mode) {
+  if (!map) return;
+  const requestId = ++overlayRequestId;
+  const bounds = normalizeBounds(statsData.bounds);
+  const sources = imageSources(name);
+  const place = (url) => {
+    if (requestId !== overlayRequestId) return; // daha yeni bir istek var, bunu at
+    const opacity = num($("#map-opacity")?.value, 0.8);
+    if (mapOverlay) map.removeLayer(mapOverlay);
+    mapOverlay = L.imageOverlay(url, bounds, { opacity, interactive: false }).addTo(map);
+  };
+  // WebP -> PNG -> placeholder sırasıyla dene
+  const tryLoad = (i) => {
+    if (i >= sources.length) {
+      place(createPlaceholderSVG("GEOREFERENCED DEMO OVERLAY", sources[sources.length - 1], true, mode));
+      return;
+    }
+    const test = new Image();
+    test.onload = () => place(sources[i]);
+    test.onerror = () => tryLoad(i + 1);
+    test.src = sources[i];
+  };
+  tryLoad(0);
+}
+
+// ---------- İstatistikler ----------
+
+function animateValue(element, end, duration, suffix = "", prefix = "") {
+  if (!element) return;
+  const start = performance.now();
+  const tick = (now) => {
+    const p = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    element.textContent = `${prefix}${(end * eased).toFixed(2)}${suffix}`;
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+async function loadStats() {
+  try {
+    const response = await fetch("data/stats.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const json = await response.json();
+    // JSON'daki null/undefined alanlar varsayılanları ezmesin
+    const clean = Object.fromEntries(
+      Object.entries(json || {}).filter(([, v]) => v !== null && v !== undefined)
+    );
+    statsData = { ...DEFAULT_STATS, ...clean };
+  } catch (error) {
+    console.warn("stats.json could not be loaded; fallback values are in use.", error);
+  }
+
+  const areaBefore = num(statsData.water_before_km2);
+  const areaAfter = num(statsData.water_after_km2);
+  const changePercent = num(
+    statsData.water_change_pct,
+    areaBefore ? ((areaAfter - areaBefore) / areaBefore) * 100 : 0
+  );
+  const waterGain = num(statsData.water_gain_km2);
+  const waterLoss = num(statsData.water_loss_km2);
+  const region = statsData.region || DEFAULT_STATS.region;
+  const beforeDate = statsData.before_date || DEFAULT_STATS.before_date;
+  const afterDate = statsData.after_date || DEFAULT_STATS.after_date;
+  const bounds = normalizeBounds(statsData.bounds);
+
+  setText("#stat-region", region);
+  setText("#stat-bounds",
+    `Bounds: ${bounds[0][0].toFixed(3)}, ${bounds[0][1].toFixed(3)} -> ` +
+    `${bounds[1][0].toFixed(3)}, ${bounds[1][1].toFixed(3)}`);
+  setText("#label-stat-date1", `Baseline (${beforeDate})`);
+  setText("#label-stat-date2", `After (${afterDate})`);
+  setText("#label-date1", `BEFORE: ${beforeDate} (${areaBefore.toFixed(1)} km²)`);
+  setText("#label-date2", `AFTER: ${afterDate} (${areaAfter.toFixed(1)} km²)`);
+  setText("#stat-diff-km2",
+    `Gain: +${waterGain.toFixed(1)} km² · Loss: -${waterLoss.toFixed(1)} km²`);
+
+  animateValue($("#stat-area1"), areaBefore, 900, " km²");
+  animateValue($("#stat-area2"), areaAfter, 900, " km²");
+  animateValue($("#stat-change"), changePercent, 1000, "%", changePercent > 0 ? "+" : "");
+
+  const maxArea = Math.max(areaBefore, areaAfter, 1) * 1.1;
+  const bar1 = $("#bar-area1");
+  const bar2 = $("#bar-area2");
+  if (bar1) bar1.style.width = `${Math.min(100, areaBefore / maxArea * 100)}%`;
+  if (bar2) bar2.style.width = `${Math.min(100, areaAfter / maxArea * 100)}%`;
+
+  if (changePercent > 0) {
+    setText("#severity-badge", `OBSERVED WATER EXPANSION: +${changePercent.toFixed(1)}%`);
+  } else if (changePercent < 0) {
+    setText("#severity-badge", `OBSERVED WATER RECESSION: ${changePercent.toFixed(1)}%`);
+  } else {
+    setText("#severity-badge", "LIMITED NET WATER CHANGE");
+  }
+
+  synchronizeThresholdControls();
+  updateViewer();
+}
+
+// ---------- Fare ile koordinat okuma ----------
+
+function handleStageHover(event) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+  const b = normalizeBounds(statsData.bounds); // [[south, west], [north, east]]
+  const lat = b[1][0] - y * (b[1][0] - b[0][0]);
+  const lon = b[0][1] + x * (b[1][1] - b[0][1]);
+  setText("#cur-coords", `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+  // PNG files do not contain quantitative dB values. Avoid fabricating telemetry.
+  setText("#cur-db", "N/A (PNG)");
+  const cls = $("#cur-class");
+  if (cls) {
+    cls.textContent = "VISUAL INSPECTION";
+    cls.className = "tag-neutral";
+  }
+}
+
+// ---------- Eşik kontrolleri ----------
+
+function synchronizeThresholdControls() {
+  const hh = num(statsData.hh_threshold_db, -19);
+  const hv = num(statsData.hv_threshold_db, -24);
+  const slider = $("#threshold-slider");
+
+  if (slider) slider.value = hh.toString();
+  setText("#threshold-value", `${hh.toFixed(1)} dB`);
+  setText("#sim-est-area", `Analysis rule: HH < ${hh.toFixed(1)} dB · HV < ${hv.toFixed(1)} dB`);
+  applyThresholdPreviewFilter();
+}
+
+// ---------- Olay dinleyicileri ----------
+
+function setMode(mode) {
+  currentMode = mode;
+  $$(".mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  viewportSlider?.classList.toggle("hidden", mode !== "slider");
+  viewportMap?.classList.toggle("hidden", mode !== "map");
+}
+
+$$(".mode-btn").forEach(button => button.addEventListener("click", () => {
+  setMode(button.dataset.mode);
+  // Leaflet yüklenemezse boş harita ekranında kalmak yerine slider moduna dön
+  if (currentMode === "map" && !initOrUpdateMap()) setMode("slider");
+}));
+
+$$(".layer-btn").forEach(button => button.addEventListener("click", () => {
+  $$(".layer-btn").forEach(b => b.classList.remove("active"));
+  button.classList.add("active");
+  currentLayer = button.dataset.layer;
+  updateViewer();
+}));
+
+$$(".band-btn").forEach(button => button.addEventListener("click", () => {
+  if (currentLayer !== "radar") return; // bant seçimi yalnızca radar katmanında geçerli
+  $$(".band-btn").forEach(b => b.classList.remove("active"));
+  button.classList.add("active");
+  currentBand = button.dataset.band;
+  updateViewer();
+}));
+
+$("#map-opacity")?.addEventListener("input", event => {
+  const value = Number(event.target.value);
+  setText("#map-opacity-val", `${Math.round(value * 100)}%`);
+  mapOverlay?.setOpacity(value);
+});
+
+$("#threshold-slider")?.addEventListener("input", (event) => {
+  const selectedHH = Number(event.target.value);
+  const actualHV = num(statsData.hv_threshold_db, -24);
+
+  setText("#threshold-value", `${selectedHH.toFixed(1)} dB`);
+  setText("#sim-est-area",
+    `Preview: HH < ${selectedHH.toFixed(1)} dB · ` +
+    `Fixed HV rule: HV < ${actualHV.toFixed(1)} dB · ` +
+    `Visual preview only; valid km² values come from Python analysis.`);
+
+  // Visual preview only. This does not reclassify GCOV data or calculate area.
+  applyThresholdPreviewFilter();
+});
+
+$("#interactive-stage")?.addEventListener("mousemove", handleStageHover);
+$("#single-stage")?.addEventListener("mousemove", handleStageHover);
+$("#btn-export")?.addEventListener("click", () => window.print());
+
+// loadStats() zaten sonunda updateViewer() çağırıyor; ikinci çağrı gereksiz istek üretiyordu
+loadStats();
