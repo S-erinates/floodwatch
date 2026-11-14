@@ -1,7 +1,9 @@
-// State
-let currentMode = "slider"; // 'slider' | 'map'
-let currentLayer = "radar"; // 'radar' | 'water' | 'change'
-let currentBand = "HH";     // 'HH' | 'HV'
+// FloodWatch Mission Control - script.js
+// Static front-end only. Works with GitHub Pages and data/stats.json.
+
+let currentMode = "slider";
+let currentLayer = "radar";
+let currentBand = "HH";
 let statsData = {
   region: "Inner Niger Delta, Mali",
   before_date: "2026-07-17",
@@ -11,28 +13,46 @@ let statsData = {
   water_gain_km2: 2360.5,
   water_loss_km2: 265.8,
   water_change_pct: 202.3,
+  hh_threshold_db: -19,
+  hv_threshold_db: -24,
   bounds: [
     [14.493970156609581, -5.00946245265618],
     [15.507051854135497, -3.995937159485534]
   ]
 };
 
-// DOM References
-const imgBefore = document.getElementById("img-before");
-const imgAfter = document.getElementById("img-after");
-const imgChange = document.getElementById("img-change");
-const viewportSlider = document.getElementById("viewport-slider");
-const viewportMap = document.getElementById("viewport-map");
-const sliderContainer = document.getElementById("slider-container");
-const singleContainer = document.getElementById("single-container");
-const bandGroup = document.getElementById("band-group");
-const viewTitle = document.getElementById("current-view-title");
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => document.querySelectorAll(selector);
 
-// Leaflet Map Instance
+const imgBefore = $("#img-before");
+const imgAfter = $("#img-after");
+const imgChange = $("#img-change");
+const viewportSlider = $("#viewport-slider");
+const viewportMap = $("#viewport-map");
+const sliderContainer = $("#slider-container");
+const singleContainer = $("#single-container");
+const bandGroup = $("#band-group");
+const viewTitle = $("#current-view-title");
+
 let map = null;
 let mapOverlay = null;
 
-// High-Detail Radar SVG Placeholder Generator (Fallback before Doğaca's PNGs arrive)
+function normalizeBounds(raw) {
+  if (Array.isArray(raw) && raw.length === 2) return raw;
+  if (raw && [raw.south, raw.west, raw.north, raw.east].every(Number.isFinite)) {
+    return [[raw.south, raw.west], [raw.north, raw.east]];
+  }
+  return [[14.493970156609581, -5.00946245265618], [15.507051854135497, -3.995937159485534]];
+}
+
+function num(...values) {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
 function createPlaceholderSVG(title, subtitle, isAfter, mode) {
   const bg = mode === "water" ? "#040812" : mode === "change" ? "#090f1d" : "#111827";
   const waterColor = mode === "water" ? "#38bdf8" : mode === "change" ? "#f43f5e" : "#030712";
@@ -44,368 +64,266 @@ function createPlaceholderSVG(title, subtitle, isAfter, mode) {
       <line x1="0" y1="135" x2="960" y2="135"/><line x1="0" y1="270" x2="960" y2="270"/><line x1="0" y1="405" x2="960" y2="405"/>
       <line x1="240" y1="0" x2="240" y2="540"/><line x1="480" y1="0" x2="480" y2="540"/><line x1="720" y1="0" x2="720" y2="540"/>
     </g>
-    <ellipse cx="480" cy="280" rx="${rx + 45}" ry="${ry + 30}" fill="${mode === 'change' ? '#38bdf8' : waterColor}" opacity="0.28"/>
+    <ellipse cx="480" cy="280" rx="${rx + 45}" ry="${ry + 30}" fill="${mode === "change" ? "#38bdf8" : waterColor}" opacity="0.28"/>
     <ellipse cx="480" cy="280" rx="${rx}" ry="${ry}" fill="${waterColor}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6 4"/>
     <text x="32" y="46" fill="#38bdf8" font-family="monospace" font-size="22" font-weight="bold">${title}</text>
-    <text x="32" y="78" fill="#94a3b8" font-family="monospace" font-size="15">FILE: ${subtitle} • NISAR L-BAND GCOV SIMULATED FEED</text>
+    <text x="32" y="78" fill="#94a3b8" font-family="monospace" font-size="15">DEMO PLACEHOLDER • ${subtitle}</text>
   </svg>`;
-  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
-function setImageWithFallback(imgElement, filePath, title, isAfter, mode) {
-  imgElement.onerror = function () {
+function setImageWithFallback(element, path, title, isAfter, mode) {
+  element.onerror = function () {
     this.onerror = null;
-    this.src = createPlaceholderSVG(title, filePath, isAfter, mode);
+    this.src = createPlaceholderSVG(title, path, isAfter, mode);
   };
-  imgElement.src = filePath;
+  element.src = path;
 }
 
-// Update Active Layer & Band Images
+function activeMapPath() {
+  if (currentLayer === "water") return "data/water_after.png";
+  if (currentLayer === "change") return "data/change_map.png";
+  return `data/after_${currentBand}.png`;
+}
+
 function updateViewer() {
- let activeMapImage = `data/after_${currentBand}.png`;
-  let fallbackMode = "radar";
+  let fallbackMode = currentLayer;
+  if (currentLayer !== "radar") {
+    imgBefore.style.filter = "none";
+    imgAfter.style.filter = "none";
+  }
 
   if (currentLayer === "radar") {
     sliderContainer.classList.remove("hidden");
     singleContainer.classList.add("hidden");
     bandGroup.classList.remove("disabled-group");
 
-    const beforeFile = `data/before_${currentBand}.png`;
-    const afterFile = `data/after_${currentBand}.png`;
-
     setImageWithFallback(
       imgBefore,
-      beforeFile,
-      `BEFORE (${statsData.before_date}) — ${currentBand}`,
+      `data/before_${currentBand}.png`,
+      `BEFORE (${statsData.before_date}) - ${currentBand}`,
       false,
       "radar"
     );
-
     setImageWithFallback(
       imgAfter,
-      afterFile,
-      `AFTER (${statsData.after_date}) — ${currentBand}`,
+      `data/after_${currentBand}.png`,
+      `AFTER (${statsData.after_date}) - ${currentBand}`,
       true,
       "radar"
     );
-
-    viewTitle.textContent =
-      `ACTIVE FEED: RADAR BACKSCATTER (${currentBand} BAND)`;
-
-    activeMapImage = afterFile;
-    fallbackMode = "radar";
-  }
-
-  else if (currentLayer === "water") {
+    viewTitle.textContent = `ACTIVE FEED: RADAR BACKSCATTER (${currentBand} BAND)`;
+  } else if (currentLayer === "water") {
     sliderContainer.classList.remove("hidden");
     singleContainer.classList.add("hidden");
     bandGroup.classList.add("disabled-group");
 
-    const beforeFile = "data/water_before.png";
-    const afterFile = "data/water_after.png";
-
-    setImageWithFallback(
-      imgBefore,
-      beforeFile,
-      `BEFORE WATER MASK (${statsData.before_date})`,
-      false,
-      "water"
-    );
-
-    setImageWithFallback(
-      imgAfter,
-      afterFile,
-      `AFTER WATER MASK (${statsData.after_date})`,
-      true,
-      "water"
-    );
-
-    viewTitle.textContent =
-      "ACTIVE FEED: OPEN-WATER MASK COMPARISON";
-
-    activeMapImage = afterFile;
-    fallbackMode = "water";
-  }
-
-  else if (currentLayer === "change") {
+    setImageWithFallback(imgBefore, "data/water_before.png", "BEFORE WATER MASK", false, "water");
+    setImageWithFallback(imgAfter, "data/water_after.png", "AFTER WATER MASK", true, "water");
+    viewTitle.textContent = "ACTIVE FEED: OPEN-WATER MASK COMPARISON";
+  } else {
     sliderContainer.classList.add("hidden");
     singleContainer.classList.remove("hidden");
     bandGroup.classList.add("disabled-group");
 
-    const changeFile = "data/change_map.png";
-
-    setImageWithFallback(
-      imgChange,
-      changeFile,
-      "INNER NIGER DELTA WATER CHANGE MAP",
-      true,
-      "change"
-    );
-
-    viewTitle.textContent =
-      "ACTIVE FEED: MULTI-TEMPORAL WATER CHANGE MAP";
-
-    activeMapImage = changeFile;
-    fallbackMode = "change";
+    setImageWithFallback(imgChange, "data/change_map.png", "INNER NIGER DELTA WATER CHANGE", true, "change");
+    viewTitle.textContent = "ACTIVE FEED: MULTI-TEMPORAL WATER CHANGE MAP";
   }
 
   if (currentMode === "map") {
-    updateLeafletOverlay(activeMapImage, fallbackMode);
+    updateLeafletOverlay(activeMapPath(), fallbackMode);
   }
 }
-
-// Initialize & Update Leaflet Geo-Map with `bounds`
 function initOrUpdateMap() {
-  const b = statsData.bounds || [[39.68, 36.92], [39.82, 37.15]];
-  if (!map) {
-    map = L.map("leaflet-map").fitBounds(b);
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-      attribution: "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and NASA NISAR"
-    }).addTo(map);
-  } else {
-    map.invalidateSize();
-    map.fitBounds(b);
-  }
-  updateViewer();
-}
-
-function updateLeafletOverlay(imagePath, fallbackMode) {
-  if (!map) return;
-  const b = statsData.bounds || [[39.68, 36.92], [39.82, 37.15]];
-  const opacity = parseFloat(document.getElementById("map-opacity").value || "0.8");
-
-  const testImg = new Image();
-  testImg.onload = () => {
-    if (mapOverlay) map.removeLayer(mapOverlay);
-    mapOverlay = L.imageOverlay(imagePath, b, { opacity }).addTo(map);
-  };
-  testImg.onerror = () => {
-    const svgUrl = createPlaceholderSVG("GEOREFERENCED SAR OVERLAY", imagePath, true, fallbackMode);
-    if (mapOverlay) map.removeLayer(mapOverlay);
-    mapOverlay = L.imageOverlay(svgUrl, b, { opacity }).addTo(map);
-  };
-  testImg.src = imagePath;
-}
-
-// Smooth Counter Animation
-function animateValue(el, start, end, duration, suffix = "", prefix = "") {
-  const startTime = performance.now();
-  function frame(now) {
-    const progress = Math.min((now - startTime) / duration, 1);
-    const val = (start + (end - start) * progress).toFixed(2);
-    el.textContent = `${prefix}${val}${suffix}`;
-    if (progress < 1) requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-}
-async function loadStats() {
-  try {
-    const response = await fetch("data/stats.json", {
-      cache: "no-store"
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    statsData = await response.json();
-  } catch (error) {
-    console.error("stats.json could not be loaded:", error);
+  if (typeof L === "undefined") {
+    alert("Harita kutuphanesi yuklenemedi. Internet baglantisini kontrol edin.");
     return;
   }
-
-  const areaBefore = Number(statsData.water_before_km2);
-  const areaAfter = Number(statsData.water_after_km2);
-  const changePercent = Number(statsData.water_change_pct);
-  const waterGain = Number(statsData.water_gain_km2);
-  const waterLoss = Number(statsData.water_loss_km2);
-
-  const beforeDate = statsData.before_date;
-  const afterDate = statsData.after_date;
-
-  const region =
-    statsData.region || "Inner Niger Delta, Mali";
-
-  document.getElementById("stat-region").textContent =
-    region;
-
-  document.getElementById("label-stat-date1").textContent =
-    `Baseline (${beforeDate})`;
-
-  document.getElementById("label-stat-date2").textContent =
-    `After (${afterDate})`;
-
-  document.getElementById("label-date1").textContent =
-    `BEFORE: ${beforeDate} (${areaBefore.toFixed(1)} km²)`;
-
-  document.getElementById("label-date2").textContent =
-    `AFTER: ${afterDate} (${areaAfter.toFixed(1)} km²)`;
-
-  animateValue(
-    document.getElementById("stat-area1"),
-    0,
-    areaBefore,
-    900,
-    " km²"
-  );
-
-  animateValue(
-    document.getElementById("stat-area2"),
-    0,
-    areaAfter,
-    900,
-    " km²"
-  );
-
-  animateValue(
-    document.getElementById("stat-change"),
-    0,
-    changePercent,
-    1000,
-    "%",
-    changePercent > 0 ? "+" : ""
-  );
-
-  document.getElementById("stat-diff-km2").textContent =
-    `Gain: +${waterGain.toFixed(1)} km² · ` +
-    `Loss: -${waterLoss.toFixed(1)} km²`;
-
-  const maximumArea =
-    Math.max(areaBefore, areaAfter, 1) * 1.1;
-
-  document.getElementById("bar-area1").style.width =
-    `${Math.min(100, areaBefore / maximumArea * 100)}%`;
-
-  document.getElementById("bar-area2").style.width =
-    `${Math.min(100, areaAfter / maximumArea * 100)}%`;
-
-  const bounds = statsData.bounds;
-
-  if (bounds) {
-    document.getElementById("stat-bounds").textContent =
-      `Bounds: ` +
-      `${bounds[0][0].toFixed(3)}, ${bounds[0][1].toFixed(3)} → ` +
-      `${bounds[1][0].toFixed(3)}, ${bounds[1][1].toFixed(3)}`;
-  }
-
-  const badge =
-    document.getElementById("severity-badge");
-
-  if (changePercent > 0) {
-    badge.textContent =
-      `OBSERVED WATER EXPANSION: +${changePercent.toFixed(1)}%`;
-  } else if (changePercent < 0) {
-    badge.textContent =
-      `OBSERVED WATER RECESSION: ${changePercent.toFixed(1)}%`;
+  const bounds = normalizeBounds(statsData.bounds);
+  if (!map) {
+    map = L.map("leaflet-map", { scrollWheelZoom: true }).fitBounds(bounds);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics",
+      maxZoom: 19
+    }).addTo(map);
   } else {
-    badge.textContent =
-      "LIMITED NET WATER CHANGE";
+    map.fitBounds(bounds);
+  }
+  setTimeout(() => map.invalidateSize(), 120);
+  updateLeafletOverlay(activeMapPath(), currentLayer);
+}
+
+function updateLeafletOverlay(path, mode) {
+  if (!map) return;
+  const bounds = normalizeBounds(statsData.bounds);
+  const opacity = num($("#map-opacity")?.value, 0.8);
+  const test = new Image();
+  const place = (url) => {
+    if (mapOverlay) map.removeLayer(mapOverlay);
+    mapOverlay = L.imageOverlay(url, bounds, { opacity, interactive: false }).addTo(map);
+  };
+  test.onload = () => place(path);
+  test.onerror = () => place(createPlaceholderSVG("GEOREFERENCED DEMO OVERLAY", path, true, mode));
+  test.src = path;
+}
+
+function animateValue(element, end, duration, suffix = "", prefix = "") {
+  const start = performance.now();
+  const tick = (now) => {
+    const p = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    element.textContent = `${prefix}${(end * eased).toFixed(2)}${suffix}`;
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+async function loadStats() {
+  try {
+    const response = await fetch("data/stats.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    statsData = { ...statsData, ...(await response.json()) };
+  } catch (error) {
+    console.warn("stats.json could not be loaded; fallback values are in use.", error);
   }
 
+  const areaBefore = num(statsData.water_before_km2);
+  const areaAfter = num(statsData.water_after_km2);
+  const changePercent = num(
+    statsData.water_change_pct,
+    areaBefore ? ((areaAfter - areaBefore) / areaBefore) * 100 : 0
+  );
+  const waterGain = num(statsData.water_gain_km2);
+  const waterLoss = num(statsData.water_loss_km2);
+  const region = statsData.region || "Inner Niger Delta, Mali";
+  const beforeDate = statsData.before_date || "2026-07-17";
+  const afterDate = statsData.after_date || "2026-10-21";
+  const bounds = normalizeBounds(statsData.bounds);
+
+  $("#stat-region").textContent = region;
+  $("#stat-bounds").textContent =
+    `Bounds: ${bounds[0][0].toFixed(3)}, ${bounds[0][1].toFixed(3)} -> ` +
+    `${bounds[1][0].toFixed(3)}, ${bounds[1][1].toFixed(3)}`;
+  $("#label-stat-date1").textContent = `Baseline (${beforeDate})`;
+  $("#label-stat-date2").textContent = `After (${afterDate})`;
+  $("#label-date1").textContent = `BEFORE: ${beforeDate} (${areaBefore.toFixed(1)} km²)`;
+  $("#label-date2").textContent = `AFTER: ${afterDate} (${areaAfter.toFixed(1)} km²)`;
+  $("#stat-diff-km2").textContent =
+    `Gain: +${waterGain.toFixed(1)} km² · Loss: -${waterLoss.toFixed(1)} km²`;
+
+  animateValue($("#stat-area1"), areaBefore, 900, " km²");
+  animateValue($("#stat-area2"), areaAfter, 900, " km²");
+  animateValue($("#stat-change"), changePercent, 1000, "%", changePercent > 0 ? "+" : "");
+
+  const maxArea = Math.max(areaBefore, areaAfter, 1) * 1.1;
+  $("#bar-area1").style.width = `${Math.min(100, areaBefore / maxArea * 100)}%`;
+  $("#bar-area2").style.width = `${Math.min(100, areaAfter / maxArea * 100)}%`;
+
+  const badge = $("#severity-badge");
+  if (changePercent > 0) {
+    badge.textContent = `OBSERVED WATER EXPANSION: +${changePercent.toFixed(1)}%`;
+  } else if (changePercent < 0) {
+    badge.textContent = `OBSERVED WATER RECESSION: ${changePercent.toFixed(1)}%`;
+  } else {
+    badge.textContent = "LIMITED NET WATER CHANGE";
+  }
+
+  synchronizeThresholdControls();
   updateViewer();
 }
-// Load stats.json
+function handleStageHover(event) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+  const b = normalizeBounds(statsData.bounds);
+  const lat = b[1][0] - y * (b[1][0] - b[0][0]);
+  const lon = b[0][1] + x * (b[1][1] - b[0][1]);
+  $("#cur-coords").textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  // PNG files do not contain quantitative dB values. Avoid fabricating telemetry.
+  $("#cur-db").textContent = "N/A (PNG)";
+  $("#cur-class").textContent = "VISUAL INSPECTION";
+  $("#cur-class").className = "tag-neutral";
+}
 
+$$('.mode-btn').forEach(button => button.addEventListener('click', () => {
+  $$('.mode-btn').forEach(b => b.classList.remove('active'));
+  button.classList.add('active');
+  currentMode = button.dataset.mode;
+  viewportSlider.classList.toggle('hidden', currentMode !== 'slider');
+  viewportMap.classList.toggle('hidden', currentMode !== 'map');
+  if (currentMode === 'map') initOrUpdateMap();
+}));
 
-// Interactive Otsu / dB Threshold Simulator
-document.getElementById("threshold-slider").addEventListener("input", (e) => {
-  const db = parseFloat(e.target.value);
-  document.getElementById("threshold-readout").innerHTML = `Backscatter Cutoff: <strong>${db.toFixed(1)} dB</strong>`;
-  
-  // Visual brightness/contrast response + simulated sensitivity readout
-  const deltaFromOptimal = db - (-19.0);
-  const baseArea2 = parseFloat(statsData.area_date2_km2 ?? 22.4);
-  const simArea = Math.max(0.5, baseArea2 * (1 + deltaFromOptimal * 0.045)).toFixed(2);
-  document.getElementById("sim-est-area").textContent = `Simulated Date-2 Water Mask: ~${simArea} km²`;
+$$('.layer-btn').forEach(button => button.addEventListener('click', () => {
+  $$('.layer-btn').forEach(b => b.classList.remove('active'));
+  button.classList.add('active');
+  currentLayer = button.dataset.layer;
+  updateViewer();
+}));
 
-  const contrast = 100 + deltaFromOptimal * 4;
-  const brightness = 100 - deltaFromOptimal * 2.5;
-  imgBefore.style.filter = `contrast(${contrast}%) brightness(${brightness}%)`;
-  imgAfter.style.filter = `contrast(${contrast}%) brightness(${brightness}%)`;
+$$('.band-btn').forEach(button => button.addEventListener('click', () => {
+  $$('.band-btn').forEach(b => b.classList.remove('active'));
+  button.classList.add('active');
+  currentBand = button.dataset.band;
+  updateViewer();
+}));
+
+$("#map-opacity")?.addEventListener("input", event => {
+  const value = Number(event.target.value);
+  $("#map-opacity-val").textContent = `${Math.round(value * 100)}%`;
+  mapOverlay?.setOpacity(value);
 });
 
-// Live Telemetry Crosshair Inspector on Image Hover
-function handleStageHover(e) {
-  const rect = e.currentTarget.getBoundingClientRect();
-  const relX = (e.clientX - rect.left) / rect.width;
-  const relY = (e.clientY - rect.top) / rect.height;
+function synchronizeThresholdControls() {
+  const hh = num(statsData.hh_threshold_db, -19);
+  const hv = num(statsData.hv_threshold_db, -24);
+  const slider = document.getElementById("threshold-slider");
+  const value = document.getElementById("threshold-value");
+  const information = document.getElementById("sim-est-area");
 
-  const b = statsData.bounds || [[39.68, 36.92], [39.82, 37.15]];
-  const lat = (b[1][0] - relY * (b[1][0] - b[0][0])).toFixed(4);
-  const lon = (b[0][1] + relX * (b[1][1] - b[0][1])).toFixed(4);
-
-  // Distance from center simulates water basin low dB vs land high dB
-  const distFromCenter = Math.hypot(relX - 0.5, relY - 0.5);
-  const isWaterZone = distFromCenter < 0.24;
-  const estDb = isWaterZone
-    ? (-22.8 + distFromCenter * 14).toFixed(1)
-    : (-14.2 + distFromCenter * 12).toFixed(1);
-
-  document.getElementById("cur-coords").textContent = `${lat}°N, ${lon}°E`;
-  document.getElementById("cur-db").textContent = `${estDb} dB`;
-
-  const clsEl = document.getElementById("cur-class");
-  if (isWaterZone) {
-    clsEl.textContent = "SPECULAR WATER";
-    clsEl.className = "tag-water";
-  } else {
-    clsEl.textContent = "LAND / CANOPY";
-    clsEl.className = "tag-land";
+  if (slider) slider.value = hh.toString();
+  if (value) value.textContent = `${hh.toFixed(1)} dB`;
+  if (information) {
+    information.textContent =
+      `Analysis rule: HH < ${hh.toFixed(1)} dB · HV < ${hv.toFixed(1)} dB`;
   }
 }
 
-document.getElementById("interactive-stage").addEventListener("mousemove", handleStageHover);
-document.getElementById("single-stage").addEventListener("mousemove", handleStageHover);
+const thresholdSlider = document.getElementById("threshold-slider");
+if (thresholdSlider) {
+  thresholdSlider.addEventListener("input", (event) => {
+    const selectedHHThreshold = Number(event.target.value);
+    const actualHVThreshold = num(statsData.hv_threshold_db, -24);
+    const actualHHThreshold = num(statsData.hh_threshold_db, -19);
+    const thresholdValue = document.getElementById("threshold-value");
+    const simulatorInformation = document.getElementById("sim-est-area");
 
-// Mode Switcher (Slider vs Geo-Map)
-document.querySelectorAll(".mode-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".mode-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentMode = btn.getAttribute("data-mode");
+    if (thresholdValue) {
+      thresholdValue.textContent = `${selectedHHThreshold.toFixed(1)} dB`;
+    }
+    if (simulatorInformation) {
+      simulatorInformation.textContent =
+        `Preview: HH < ${selectedHHThreshold.toFixed(1)} dB · ` +
+        `Fixed HV rule: HV < ${actualHVThreshold.toFixed(1)} dB · ` +
+        `Visual preview only; valid km² values come from Python analysis.`;
+    }
 
-    if (currentMode === "map") {
-      viewportSlider.classList.add("hidden");
-      viewportMap.classList.remove("hidden");
-      initOrUpdateMap();
-    } else {
-      viewportMap.classList.add("hidden");
-      viewportSlider.classList.remove("hidden");
+    // Visual preview only. This does not reclassify GCOV data or calculate area.
+    const difference = selectedHHThreshold - actualHHThreshold;
+    const contrast = Math.max(75, Math.min(135, 100 + difference * 3));
+    const brightness = Math.max(75, Math.min(125, 100 - difference * 2));
+
+    if (imgBefore && currentLayer === "radar") {
+      imgBefore.style.filter = `contrast(${contrast}%) brightness(${brightness}%)`;
+    }
+    if (imgAfter && currentLayer === "radar") {
+      imgAfter.style.filter = `contrast(${contrast}%) brightness(${brightness}%)`;
     }
   });
-});
+}
+$("#interactive-stage")?.addEventListener("mousemove", handleStageHover);
+$("#single-stage")?.addEventListener("mousemove", handleStageHover);
+$("#btn-export")?.addEventListener("click", () => window.print());
 
-// Layer & Band Buttons
-document.querySelectorAll(".layer-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".layer-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentLayer = btn.getAttribute("data-layer");
-    updateViewer();
-  });
-});
-
-document.querySelectorAll(".band-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".band-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentBand = btn.getAttribute("data-band");
-    updateViewer();
-  });
-});
-
-// Map Opacity Slider
-document.getElementById("map-opacity").addEventListener("input", (e) => {
-  const val = parseFloat(e.target.value);
-  document.getElementById("map-opacity-val").textContent = `${Math.round(val * 100)}%`;
-  if (mapOverlay) mapOverlay.setOpacity(val);
-});
-
-// Export Briefing Button
-document.getElementById("btn-export").addEventListener("click", () => {
-  window.print();
-});
-
-// Boot
 loadStats();
 updateViewer();
