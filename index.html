@@ -36,7 +36,7 @@
     <div class="hero-chip">NASA SPACE APPS CHALLENGE • ASF DAAC VERTEX</div>
     <h1>All-Weather Radar Surface Water & Flood Intelligence</h1>
     <p id="project-subtitle">
-      Tracking dynamic inundation, flood expansion, and reservoir changes using dual-polarization (HH/HV) NISAR L-band Synthetic Aperture Radar—penetrating clouds, rain, and darkness.
+      Tracking seasonal flood expansion in the Inner Niger Delta using dual-polarization (HH/HV) NISAR L-band Synthetic Aperture Radar—penetrating clouds, rain, and darkness.
     </p>
   </header>
 
@@ -50,6 +50,8 @@
         </div>
         <strong id="stat-region">Loading...</strong>
         <span class="stat-sub" id="stat-bounds">Bounds: --</span>
+        <span class="stat-sub">NISAR L2 GCOV · Track 138 · Frame 081 · Descending</span>
+        <span class="stat-sub" id="stat-coverage"></span>
       </div>
 
       <div class="stat-card">
@@ -77,6 +79,7 @@
         </div>
         <strong id="stat-change">--%</strong>
         <span class="stat-sub" id="stat-diff-km2">Delta: -- km²</span>
+        <span class="stat-sub" id="stat-hh-check"></span>
       </div>
     </section>
 
@@ -215,7 +218,31 @@
           <span class="swatch swatch-recede"></span>
           <span><strong>Water Loss:</strong> Receded Water / Drawdown</span>
         </div>
+        <div class="legend-item">
+          <span class="swatch swatch-nodata"></span>
+          <span><strong>No Data / Excluded:</strong> Artifacts removed from statistics</span>
+        </div>
       </div>
+    </section>
+
+    <!-- FIVE-DATE TIME SERIES (stats.json → time_series) -->
+    <section class="viewer-card hidden" id="timeseries-card">
+      <div class="viewer-header">
+        <div class="ts-title">OPEN-WATER EXTENT · FIVE-DATE TIME SERIES</div>
+        <span class="stat-sub" id="ts-summary"></span>
+      </div>
+      <div class="ts-wrap" id="ts-wrap">
+        <div id="ts-chart" role="img" aria-label="Line chart of estimated open-water area by observation date"></div>
+        <div class="ts-tooltip hidden" id="ts-tooltip" role="status"></div>
+      </div>
+      <p class="slider-hint" id="ts-note"></p>
+      <details class="ts-details">
+        <summary>Show data table</summary>
+        <table class="ts-table">
+          <thead><tr><th scope="col">Observation date</th><th scope="col">Estimated open water (km²)</th><th scope="col">Change vs. baseline</th></tr></thead>
+          <tbody id="ts-table-body"></tbody>
+        </table>
+      </details>
     </section>
 
     <!-- SCIENTIFIC NARRATIVE & ANALYSIS CARDS -->
@@ -232,8 +259,8 @@
         <div class="card-kicker">REGIONAL CONTEXT & PIPELINE</div>
         <h2>🌍 Study Area & Methodology</h2>
         <p id="meral-method-box">
-          <strong>Study Area:</strong> Inner Niger Delta, Mali — one of Africa's largest seasonal floodplains. Two co-registered NISAR GCOV scenes (matching track, frame, and orbit direction), acquired on 17 July 2026 (pre-flood baseline) and 21 October 2026 (flood season), were retrieved via ASF Vertex.<br><br>
-          <strong>Processing Pipeline:</strong> Using Python (<code>h5py</code>), the <code>HHHH</code> and <code>HVHV</code> covariance grids under <code>science/LSAR/GCOV/grids/frequencyA/</code> were converted to decibels (<code>10 * log10</code>), filtered for speckle noise, and classified as open water where <strong>HH &lt; -19 dB and HV &lt; -24 dB</strong>. Water area (km²) and net change were then computed from the classified pixels.
+          <strong>Study Area:</strong> Inner Niger Delta, Mali — one of Africa's largest seasonal floodplains. Two co-registered NISAR GCOV scenes (L-band, track 138, frame 081, descending orbit), acquired on 17 July 2026 (pre-flood baseline) and 21 October 2026 (flood season), were retrieved via ASF Vertex.<br><br>
+          <strong>Processing Pipeline:</strong> Using Python (<code>h5py</code>), the <code>HHHH</code> and <code>HVHV</code> covariance grids under <code>science/LSAR/GCOV/grids/frequencyA/</code> were block-averaged from 20 m native pixels to 60 m in linear power, converted to decibels (<code>10 * log10</code>), and classified as open water where <strong>HH &lt; -19 dB and HV &lt; -24 dB</strong>. A 5 × 5 majority filter then removed isolated noisy pixels. An area of about 1,525 km² affected by artificial radar brightening in the 21 October HV image was excluded, so all areas (km²) and the net change refer only to the valid analysis area. As an independent check, the change in HH backscatter (&gt; 3 dB drop or rise) was compared with the classified water gain and loss.
         </p>
       </article>
 
@@ -251,7 +278,7 @@
           </div>
           <div>
             <h3>NISAR Future Applications</h3>
-            <p>With NISAR's systematic 12-day repeat cycle, FloodWatch could scale into an operational early flood warning system, drought reservoir monitor, and irrigation planning tool.</p>
+            <p>With NISAR's systematic 12-day repeat cycle, FloodWatch could be extended to longer multi-year flood-pulse time series, compared with rainfall and river-level records, and developed toward automatic alerts for unusual changes in water coverage.</p>
           </div>
         </div>
       </article>
@@ -259,7 +286,7 @@
   </main>
 
   <footer class="footer">
-    <p><strong>FLOODWATCH</strong> • NASA Space Apps Challenge • Data: NASA/ISRO NISAR GCOV via ASF DAAC Vertex • Team: <strong>Doğaca</strong> (SAR Data & Python), <strong>Meral</strong> (Science & Narrative), <strong>Hasan</strong> (Web Architecture & Visualization)</p>
+    <p><strong>FLOODWATCH</strong> • NASA Space Apps Challenge • Data: NASA/ISRO NISAR GCOV via ASF DAAC Vertex • Team: <strong>Doğaca</strong> (SAR Data & Python), <strong>Meral</strong> (Science & Narrative), <strong>Hasan</strong> (Web Architecture & Visualization), <strong>Zeynep</strong></p>
   </footer>
 
   <script src="script.js"></script>
