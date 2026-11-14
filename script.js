@@ -3,13 +3,18 @@ let currentMode = "slider"; // 'slider' | 'map'
 let currentLayer = "radar"; // 'radar' | 'water' | 'change'
 let currentBand = "HH";     // 'HH' | 'HV'
 let statsData = {
-  region_name: "NISAR Target Basin",
-  date1: "2026-10-05",
-  date2: "2026-10-29",
-  area_date1_km2: 14.8,
-  area_date2_km2: 22.4,
-  change_percent: 51.35,
-  bounds: [[39.68, 36.92], [39.82, 37.15]]
+  region: "Inner Niger Delta, Mali",
+  before_date: "2026-07-17",
+  after_date: "2026-10-21",
+  water_before_km2: 1035.2,
+  water_after_km2: 3129.9,
+  water_gain_km2: 2360.5,
+  water_loss_km2: 265.8,
+  water_change_pct: 202.3,
+  bounds: [
+    [14.493970156609581, -5.00946245265618],
+    [15.507051854135497, -3.995937159485534]
+  ]
 };
 
 // DOM References
@@ -57,7 +62,7 @@ function setImageWithFallback(imgElement, filePath, title, isAfter, mode) {
 
 // Update Active Layer & Band Images
 function updateViewer() {
-  let activeMapImage = `data/date2_${currentBand}.png`;
+ let activeMapImage = `data/after_${currentBand}.png`;
   let fallbackMode = "radar";
 
   if (currentLayer === "radar") {
@@ -65,36 +70,82 @@ function updateViewer() {
     singleContainer.classList.add("hidden");
     bandGroup.classList.remove("disabled-group");
 
-    const file1 = `data/date1_${currentBand}.png`;
-    const file2 = `data/date2_${currentBand}.png`;
-    setImageWithFallback(imgBefore, file1, `DATE 1 (${statsData.date1}) — ${currentBand} BAND`, false, "radar");
-    setImageWithFallback(imgAfter, file2, `DATE 2 (${statsData.date2}) — ${currentBand} BAND`, true, "radar");
-    viewTitle.textContent = `ACTIVE FEED: RADAR BACKSCATTER (${currentBand} BAND) — SPLIT COMPARISON`;
-    activeMapImage = file2;
-    fallbackMode = "radar";
+    const beforeFile = `data/before_${currentBand}.png`;
+    const afterFile = `data/after_${currentBand}.png`;
 
-  } else if (currentLayer === "water") {
+    setImageWithFallback(
+      imgBefore,
+      beforeFile,
+      `BEFORE (${statsData.before_date}) — ${currentBand}`,
+      false,
+      "radar"
+    );
+
+    setImageWithFallback(
+      imgAfter,
+      afterFile,
+      `AFTER (${statsData.after_date}) — ${currentBand}`,
+      true,
+      "radar"
+    );
+
+    viewTitle.textContent =
+      `ACTIVE FEED: RADAR BACKSCATTER (${currentBand} BAND)`;
+
+    activeMapImage = afterFile;
+    fallbackMode = "radar";
+  }
+
+  else if (currentLayer === "water") {
     sliderContainer.classList.remove("hidden");
     singleContainer.classList.add("hidden");
     bandGroup.classList.add("disabled-group");
 
-    const file1 = "data/water_date1.png";
-    const file2 = "data/water_date2.png";
-    setImageWithFallback(imgBefore, file1, `DATE 1 WATER MASK (${statsData.date1})`, false, "water");
-    setImageWithFallback(imgAfter, file2, `DATE 2 WATER MASK (${statsData.date2})`, true, "water");
-    viewTitle.textContent = "ACTIVE FEED: BINARY WATER MASK (OTSU THRESHOLD) — SPLIT COMPARISON";
-    activeMapImage = file2;
-    fallbackMode = "water";
+    const beforeFile = "data/water_before.png";
+    const afterFile = "data/water_after.png";
 
-  } else if (currentLayer === "change") {
+    setImageWithFallback(
+      imgBefore,
+      beforeFile,
+      `BEFORE WATER MASK (${statsData.before_date})`,
+      false,
+      "water"
+    );
+
+    setImageWithFallback(
+      imgAfter,
+      afterFile,
+      `AFTER WATER MASK (${statsData.after_date})`,
+      true,
+      "water"
+    );
+
+    viewTitle.textContent =
+      "ACTIVE FEED: OPEN-WATER MASK COMPARISON";
+
+    activeMapImage = afterFile;
+    fallbackMode = "water";
+  }
+
+  else if (currentLayer === "change") {
     sliderContainer.classList.add("hidden");
     singleContainer.classList.remove("hidden");
     bandGroup.classList.add("disabled-group");
 
-    const fileChange = "data/change_map.png";
-    setImageWithFallback(imgChange, fileChange, "SURFACE WATER ANOMALY & CHANGE MAP", true, "change");
-    viewTitle.textContent = "ACTIVE FEED: MULTI-TEMPORAL INUNDATION CHANGE MAP";
-    activeMapImage = fileChange;
+    const changeFile = "data/change_map.png";
+
+    setImageWithFallback(
+      imgChange,
+      changeFile,
+      "INNER NIGER DELTA WATER CHANGE MAP",
+      true,
+      "change"
+    );
+
+    viewTitle.textContent =
+      "ACTIVE FEED: MULTI-TEMPORAL WATER CHANGE MAP";
+
+    activeMapImage = changeFile;
     fallbackMode = "change";
   }
 
@@ -147,56 +198,114 @@ function animateValue(el, start, end, duration, suffix = "", prefix = "") {
   }
   requestAnimationFrame(frame);
 }
-
-// Load stats.json
 async function loadStats() {
   try {
-    const response = await fetch("data/stats.json", { cache: "no-store" });
-    if (response.ok) {
-      statsData = await response.json();
+    const response = await fetch("data/stats.json", {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
-  } catch (e) {
-    console.warn("Using default telemetry stats:", e);
+
+    statsData = await response.json();
+  } catch (error) {
+    console.error("stats.json could not be loaded:", error);
+    return;
   }
 
-  const area1 = parseFloat(statsData.area_date1_km2 ?? statsData.water_area_date1_km2 ?? 14.8);
-  const area2 = parseFloat(statsData.area_date2_km2 ?? statsData.water_area_date2_km2 ?? 22.4);
-  const pct = parseFloat(statsData.change_percent ?? statsData.percent_change ?? 51.35);
-  const diff = (area2 - area1).toFixed(2);
+  const areaBefore = Number(statsData.water_before_km2);
+  const areaAfter = Number(statsData.water_after_km2);
+  const changePercent = Number(statsData.water_change_pct);
+  const waterGain = Number(statsData.water_gain_km2);
+  const waterLoss = Number(statsData.water_loss_km2);
 
-  document.getElementById("stat-region").textContent = statsData.region_name || "NISAR Target Basin";
-  document.getElementById("label-stat-date1").textContent = `Baseline (${statsData.date1 || "Date 1"})`;
-  document.getElementById("label-stat-date2").textContent = `Post-Event (${statsData.date2 || "Date 2"})`;
+  const beforeDate = statsData.before_date;
+  const afterDate = statsData.after_date;
 
-  animateValue(document.getElementById("stat-area1"), 0, area1, 900, " km²");
-  animateValue(document.getElementById("stat-area2"), 0, area2, 900, " km²");
-  animateValue(document.getElementById("stat-change"), 0, pct, 1000, "%", pct > 0 ? "+" : "");
+  const region =
+    statsData.region || "Inner Niger Delta, Mali";
 
-  document.getElementById("stat-diff-km2").textContent = `Net Delta: ${diff > 0 ? "+" : ""}${diff} km²`;
-  document.getElementById("label-date1").textContent = `BEFORE: ${statsData.date1} (${area1} km²)`;
-  document.getElementById("label-date2").textContent = `AFTER: ${statsData.date2} (${area2} km²)`;
+  document.getElementById("stat-region").textContent =
+    region;
 
-  if (statsData.bounds) {
-    document.getElementById("stat-bounds").textContent = `Bounds: ${JSON.stringify(statsData.bounds)}`;
+  document.getElementById("label-stat-date1").textContent =
+    `Baseline (${beforeDate})`;
+
+  document.getElementById("label-stat-date2").textContent =
+    `After (${afterDate})`;
+
+  document.getElementById("label-date1").textContent =
+    `BEFORE: ${beforeDate} (${areaBefore.toFixed(1)} km²)`;
+
+  document.getElementById("label-date2").textContent =
+    `AFTER: ${afterDate} (${areaAfter.toFixed(1)} km²)`;
+
+  animateValue(
+    document.getElementById("stat-area1"),
+    0,
+    areaBefore,
+    900,
+    " km²"
+  );
+
+  animateValue(
+    document.getElementById("stat-area2"),
+    0,
+    areaAfter,
+    900,
+    " km²"
+  );
+
+  animateValue(
+    document.getElementById("stat-change"),
+    0,
+    changePercent,
+    1000,
+    "%",
+    changePercent > 0 ? "+" : ""
+  );
+
+  document.getElementById("stat-diff-km2").textContent =
+    `Gain: +${waterGain.toFixed(1)} km² · ` +
+    `Loss: -${waterLoss.toFixed(1)} km²`;
+
+  const maximumArea =
+    Math.max(areaBefore, areaAfter, 1) * 1.1;
+
+  document.getElementById("bar-area1").style.width =
+    `${Math.min(100, areaBefore / maximumArea * 100)}%`;
+
+  document.getElementById("bar-area2").style.width =
+    `${Math.min(100, areaAfter / maximumArea * 100)}%`;
+
+  const bounds = statsData.bounds;
+
+  if (bounds) {
+    document.getElementById("stat-bounds").textContent =
+      `Bounds: ` +
+      `${bounds[0][0].toFixed(3)}, ${bounds[0][1].toFixed(3)} → ` +
+      `${bounds[1][0].toFixed(3)}, ${bounds[1][1].toFixed(3)}`;
   }
 
-  // Dynamic Progress Bars & Severity Badge
-  const maxArea = Math.max(area1, area2, 1) * 1.15;
-  document.getElementById("bar-area1").style.width = `${Math.min(100, (area1 / maxArea) * 100)}%`;
-  document.getElementById("bar-area2").style.width = `${Math.min(100, (area2 / maxArea) * 100)}%`;
+  const badge =
+    document.getElementById("severity-badge");
 
-  const badge = document.getElementById("severity-badge");
-  if (pct >= 15) {
-    badge.textContent = `⚠️ ALERT: +${pct}% INUNDATION EXPANSION`;
-    badge.style.color = "#fda4af";
-  } else if (pct <= -10) {
-    badge.textContent = `📉 DROUGHT / DRAW-DOWN: ${pct}%`;
-    badge.style.color = "#fde68a";
+  if (changePercent > 0) {
+    badge.textContent =
+      `OBSERVED WATER EXPANSION: +${changePercent.toFixed(1)}%`;
+  } else if (changePercent < 0) {
+    badge.textContent =
+      `OBSERVED WATER RECESSION: ${changePercent.toFixed(1)}%`;
   } else {
-    badge.textContent = `✅ STABLE HYDROLOGY (${pct}%)`;
-    badge.style.color = "#6ee7b7";
+    badge.textContent =
+      "LIMITED NET WATER CHANGE";
   }
+
+  updateViewer();
 }
+// Load stats.json
+
 
 // Interactive Otsu / dB Threshold Simulator
 document.getElementById("threshold-slider").addEventListener("input", (e) => {
